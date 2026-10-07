@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+package-lock.json
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+
+# Build-Ordner
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor-Dateien
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS-Dateien
+.DS_Store
+Thumbs.db
+
+# MongoDB lokale Daten (falls du lokal speicherst)
+data/db/
