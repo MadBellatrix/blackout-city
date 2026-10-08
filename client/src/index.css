@@ -1,0 +1,368 @@
+:root {
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  color: #e7f0ee;
+  background: #081111;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(circle at top right, rgba(45, 115, 104, 0.2), transparent 36rem),
+    linear-gradient(145deg, #071010, #0d1b1a 50%, #081111);
+}
+
+button {
+  font: inherit;
+}
+
+button:focus-visible {
+  outline: 3px solid #9adccf;
+  outline-offset: 3px;
+}
+
+.app-shell {
+  width: min(1240px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 32px 0 48px;
+}
+
+.resource-bar {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.resource-bar__brand h1 {
+  margin: 4px 0 0;
+  font-size: clamp(1.8rem, 3vw, 2.5rem);
+  letter-spacing: -0.06em;
+}
+
+.resource-bar__eyebrow,
+.status-panel__label {
+  color: #8ebcb2;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.resource-bar__items {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 10px;
+  flex: 1;
+  max-width: 760px;
+}
+
+.resource-card,
+.status-panel,
+.building-card,
+.prototype-note {
+  border: 1px solid rgba(168, 213, 202, 0.15);
+  background: rgba(16, 37, 35, 0.82);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.2);
+}
+
+.resource-card {
+  min-height: 82px;
+  padding: 12px 14px;
+  border-radius: 12px;
+}
+
+.resource-card--air {
+  border-color: rgba(110, 189, 213, 0.32);
+}
+
+.resource-card__label,
+.resource-card small {
+  display: block;
+  color: #9bb9b3;
+  font-size: 0.75rem;
+}
+
+.resource-card strong {
+  display: block;
+  margin: 5px 0 2px;
+  color: #f1faf7;
+  font-size: 1.15rem;
+}
+
+.resource-card small {
+  color: #75c7af;
+}
+
+.status-panel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 32px;
+  padding: 24px;
+  margin-bottom: 24px;
+  border-radius: 16px;
+}
+
+.status-panel h2,
+.prototype-note h2 {
+  margin: 5px 0;
+}
+
+.status-panel p,
+.prototype-note p {
+  max-width: 650px;
+  margin: 0;
+  color: #abc1bc;
+  line-height: 1.55;
+}
+
+.status-panel__capacity {
+  width: min(100%, 250px);
+}
+
+.status-panel__capacity span {
+  display: block;
+  color: #9bb9b3;
+  font-size: 0.8rem;
+}
+
+.status-panel__capacity strong {
+  display: block;
+  margin: 6px 0;
+  font-size: 1.5rem;
+}
+
+.capacity-bar {
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #071010;
+}
+
+.capacity-bar span {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #4dc7a5, #b4e878);
+  transition: width 180ms ease;
+}
+
+.building-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.building-card {
+  display: flex;
+  min-height: 330px;
+  flex-direction: column;
+  padding: 22px;
+  border-radius: 16px;
+}
+
+.building-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.building-card__header > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.building-card__header h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.building-card__icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 10px;
+  background: rgba(104, 186, 165, 0.14);
+  font-size: 1.25rem;
+}
+
+.level-badge {
+  padding: 6px 9px;
+  border: 1px solid rgba(150, 220, 202, 0.2);
+  border-radius: 999px;
+  color: #b8e4d9;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.building-card__description {
+  min-height: 44px;
+  color: #abc1bc;
+  line-height: 1.5;
+}
+
+.building-card__details {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 16px;
+}
+
+.building-card__detail {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid rgba(168, 213, 202, 0.09);
+  color: #a9c0bb;
+  font-size: 0.9rem;
+}
+
+.building-card__detail strong {
+  color: #edf8f4;
+  text-align: right;
+}
+
+.worker-control {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px;
+  margin: auto 0 16px;
+  border-radius: 10px;
+  background: rgba(5, 15, 14, 0.46);
+  color: #b6ccc6;
+  font-size: 0.88rem;
+}
+
+.worker-control__buttons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.worker-control__buttons button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(163, 223, 208, 0.28);
+  border-radius: 7px;
+  color: #dff5ef;
+  background: #17302d;
+  cursor: pointer;
+}
+
+.worker-control__buttons button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.worker-control__buttons strong {
+  min-width: 40px;
+  color: #f1faf7;
+  text-align: center;
+}
+
+.building-card__footer {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-top: 16px;
+  margin-top: auto;
+  border-top: 1px solid rgba(168, 213, 202, 0.12);
+}
+
+.upgrade-cost {
+  color: #92aaa5;
+  font-size: 0.76rem;
+}
+
+.upgrade-cost > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 5px;
+}
+
+.upgrade-cost > div span {
+  padding: 4px 6px;
+  border-radius: 5px;
+  color: #d7ebe5;
+  background: rgba(92, 153, 138, 0.15);
+}
+
+.upgrade-button {
+  padding: 10px 16px;
+  border: 0;
+  border-radius: 9px;
+  color: #06201a;
+  background: linear-gradient(135deg, #9adccf, #c5e98a);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.upgrade-button:disabled {
+  color: #83928f;
+  background: #243532;
+  cursor: not-allowed;
+}
+
+.prototype-note {
+  padding: 20px 24px;
+  margin-top: 24px;
+  border-radius: 16px;
+}
+
+@media (max-width: 900px) {
+  .resource-bar,
+  .status-panel {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .resource-bar__items {
+    width: 100%;
+    max-width: none;
+  }
+
+  .status-panel__capacity {
+    width: 100%;
+  }
+}
+
+@media (max-width: 650px) {
+  .app-shell {
+    width: min(100% - 20px, 1240px);
+    padding-top: 18px;
+  }
+
+  .resource-bar__items,
+  .building-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .building-card {
+    min-height: auto;
+  }
+
+  .building-card__footer {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .upgrade-button {
+    width: 100%;
+  }
+}
