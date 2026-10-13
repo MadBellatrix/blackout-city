@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const playerSchema = new mongoose.Schema({
-  // Eindeutige Spieler-ID (kann später durch Auth ersetzt werden)
+  // Eindeutige Spieler-ID
   userId: {
     type: String,
     required: true,
@@ -10,10 +10,9 @@ const playerSchema = new mongoose.Schema({
 
   // Ressourcen
   resources: {
-    fragments: { type: Number, default: 0 },
+    fragments: { type: Number, default: 100 },
     knowledge: { type: Number, default: 0 },
-    credits: { type: Number, default: 0 },
-    airCapacity: { type: Number, default: 10 }
+    credits: { type: Number, default: 0 }
   },
 
   // Gebäude-Level
@@ -24,20 +23,11 @@ const playerSchema = new mongoose.Schema({
     museum: { type: Number, default: 0 }
   },
 
-  // Aktive Arbeiter
-  workers: {
-    activeRobots: { type: Number, default: 0 },
-    activeHackers: { type: Number, default: 0 }
-  },
-
   // Zeitpunkt des letzten Saves (für Offline-Progression)
   lastSaveTime: { type: Date, default: Date.now }
 }, {
-  timestamps: true  // Erstellt createdAt und updatedAt automatisch
+  timestamps: true
 });
-
-// Index für schnelle Suche nach userId
-playerSchema.index({ userId: 1 });
 
 const Player = mongoose.model('Player', playerSchema);
 
