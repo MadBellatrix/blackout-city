@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import "./index.css";
 
 import BuildingCard from "./components/BuildingCard";
