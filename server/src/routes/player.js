@@ -1,72 +1,146 @@
 import express from 'express';
+import mongoose from 'mongoose';
 import Player from '../models/Player.js';
 
 const router = express.Router();
 
-// Neuen Spieler erstellen oder existierenden laden
-router.post('/player', async (req, res) => {
+// Fallback In-Memory Speicher für Entwicklung ohne laufende MongoDB
+const inMemoryPlayers = new Map();
+
+const getInitialPlayerData = (userId) => ({
+  userId,
+  resources: {
+    fragments: 100,
+    knowledge: 0,
+    credits: 0
+  },
+  buildings: {
+    fragmentsCollector: 0,
+    dataNode: 0,
+    airPurifier: 0,
+    museum: 0
+  },
+  lastSaveTime: new Date(),
+  createdAt: new Date(),
+  updatedAt: new Date()
+});
+
+// Spielerstand laden (oder initial anlegen, falls noch nicht existent)
+router.get('/player/:userId', async (req, res) => {
   try {
-    const { userId } = req.body;
+    const { userId } = req.params;
 
     if (!userId) {
       return res.status(400).json({ error: 'userId ist erforderlich' });
     }
 
-    // Spieler suchen oder erstellen
-    let player = await Player.findOne({ userId });
+    const isDbConnected = mongoose.connection.readyState === 1;
+    let player = null;
 
-    if (!player) {
-      player = new Player({ userId });
-      await player.save();
-      console.log(`Neuer Spieler erstellt: ${userId}`);
+    if (isDbConnected) {
+      player = await Player.findOne({ userId });
+      if (!player) {
+        player = new Player(getInitialPlayerData(userId));
+        await player.save();
+      }
+    } else {
+      if (!inMemoryPlayers.has(userId)) {
+        inMemoryPlayers.set(userId, getInitialPlayerData(userId));
+      }
+      player = inMemoryPlayers.get(userId);
     }
 
-    res.json({ player, message: 'Spieler geladen' });
-  } catch (error) {
-    console.error('Fehler beim Laden des Spielers:', error);
-    res.status(500).json({ error: 'Interner Serverfehler' });
-  }
-});
+    const now = new Date();
+    const lastSave = player.lastSaveTime ? new Date(player.lastSaveTime) : now;
+    const offlineSeconds = Math.max(0, Math.floor((now.getTime() - lastSave.getTime()) / 1000));
 
-// Spielerstand laden
-router.get('/player/:userId', async (req, res) => {
-  try {
-    const player = await Player.findOne({ userId: req.params.userId });
-
-    if (!player) {
-      return res.status(404).json({ error: 'Spieler nicht gefunden' });
-    }
-
-    res.json({ player });
-  } catch (error) {
-    console.error('Fehler beim Laden des Spielers:', error);
-    res.status(500).json({ error: 'Interner Serverfehler' });
-  }
-});
-
-// Gebäude-Upgrade
-router.post('/player/:userId/upgrade', async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const { building, level } = req.body;
-
-    const player = await Player.findOne({ userId });
-
-    if (!player) {
-      return res.status(404).json({ error: 'Spieler nicht gefunden' });
-    }
-
-    // Hier später: Kosten prüfen, Ressourcen abziehen, Level erhöhen
-    // Fürs MVP nur ein Placeholder
-    console.log(`Upgrade-Anfrage: ${building} auf Level ${level} für ${userId}`);
-
-    res.json({ 
-      message: 'Upgrade erfolgreich (Placeholder)',
-      player 
+    res.json({
+      player,
+      offlineSeconds,
+      storage: isDbConnected ? 'mongodb' : 'memory'
     });
   } catch (error) {
-    console.error('Fehler beim Upgrade:', error);
-    res.status(500).json({ error: 'Interner Serverfehler' });
+    console.error('Fehler beim Laden des Spielers:', error);
+    res.status(500).json({ error: 'Interner Serverfehler', details: error.message });
+  }
+});
+
+// Spielstand speichern
+router.post('/player/:userId/save', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { resources, buildings } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({ error: 'userId ist erforderlich' });
+    }
+
+    const isDbConnected = mongoose.connection.readyState === 1;
+    const now = new Date();
+
+    if (isDbConnected) {
+      const updatedPlayer = await Player.findOneAndUpdate(
+        { userId },
+        {
+          $set: {
+            ...(resources && { resources }),
+            ...(buildings && { buildings }),
+            lastSaveTime: now
+          }
+        },
+        { new: true, upsert: true }
+      );
+
+      return res.json({
+        success: true,
+        player: updatedPlayer,
+        storage: 'mongodb'
+      });
+    }
+
+    // In-Memory Fallback
+    const existing = inMemoryPlayers.get(userId) || getInitialPlayerData(userId);
+    const updated = {
+      ...existing,
+      resources: resources || existing.resources,
+      buildings: buildings || existing.buildings,
+      lastSaveTime: now,
+      updatedAt: now
+    };
+    inMemoryPlayers.set(userId, updated);
+
+    res.json({
+      success: true,
+      player: updated,
+      storage: 'memory'
+    });
+  } catch (error) {
+    console.error('Fehler beim Speichern des Spielers:', error);
+    res.status(500).json({ error: 'Interner Serverfehler', details: error.message });
+  }
+});
+
+// Spielstand zurücksetzen
+router.post('/player/:userId/reset', async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const isDbConnected = mongoose.connection.readyState === 1;
+    const initialData = getInitialPlayerData(userId);
+
+    if (isDbConnected) {
+      const resetPlayer = await Player.findOneAndUpdate(
+        { userId },
+        { $set: initialData },
+        { new: true, upsert: true }
+      );
+      return res.json({ success: true, player: resetPlayer, storage: 'mongodb' });
+    }
+
+    inMemoryPlayers.set(userId, initialData);
+    res.json({ success: true, player: initialData, storage: 'memory' });
+  } catch (error) {
+    console.error('Fehler beim Zurücksetzen des Spielers:', error);
+    res.status(500).json({ error: 'Interner Serverfehler', details: error.message });
   }
 });
 
