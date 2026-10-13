@@ -5,12 +5,11 @@ export const BUILDINGS = {
     icon: "🤖",
     description: "Bergungsroboter sammeln verwertbare Fragmente aus den Ruinen.",
     resource: "fragments",
+    costResource: "fragments",
     workerType: "robots",
-    baseOutput: 0.2,
-    outputIncreasePerLevel: 0.1,
-    baseCost: {
-      fragments: 50,
-    },
+    upgradeCosts: [0, 50, 200, 600, 1500, 4000],
+    productionRates: [0.2, 0.4, 0.6, 1.2, 2.0, 3.0],
+    airConsumption: [1, 1, 2, 3, 4, 5],
   },
 
   dataNode: {
@@ -19,13 +18,11 @@ export const BUILDINGS = {
     icon: "💾",
     description: "Hacker entschlüsseln Wissen aus den Netzwerken der alten Welt.",
     resource: "knowledge",
+    costResource: "knowledge",
     workerType: "hackers",
-    baseOutput: 2,
-    outputIncreasePerLevel: 1,
-    baseCost: {
-      fragments: 75,
-      knowledge: 0,
-    },
+    upgradeCosts: [0, 100, 400, 1200, 3000, 8000],
+    productionRates: [2, 4, 6, 12, 20, 30],
+    airConsumption: [1, 1, 2, 3, 4, 5],
   },
 
   airPurifier: {
@@ -33,9 +30,11 @@ export const BUILDINGS = {
     name: "Luftreiniger",
     icon: "🌬️",
     description: "Reinigt die Luft in der Kuppel und schafft Platz für Arbeitskräfte.",
-    baseCost: {
-      fragments: 100,
-    },
+    costResource: "fragments",
+    upgradeCosts: [0, 100, 300, 800, 2000, 5000],
+    maxAirCapacity: [10, 25, 50, 90, 150, 250],
+    airCapacity: [10, 25, 50, 90, 150, 250],
+    airRegeneration: [1, 1.5, 2.5, 4, 6, 9],
   },
 
   museum: {
