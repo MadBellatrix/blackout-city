@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "./index.css";
 
 import BuildingCard from "./components/BuildingCard";
+import BuildingFocusView from "./components/BuildingFocusView";
 import ResourceBar from "./components/ResourceBar";
 import { BUILDINGS } from "./utils/gameBalance";
 import {
@@ -19,10 +20,13 @@ import {
   savePlayerState,
 } from "./api/playerApi";
 
+const BUILDING_KEYS = ["fragmentsCollector", "dataNode", "airPurifier"];
+
 export default function App() {
   const [userId] = useState(() => getUserId());
   const [saveStatus, setSaveStatus] = useState({ source: "init", lastSaved: null });
   const [offlineNotice, setOfflineNotice] = useState(null);
+  const [selectedBuilding, setSelectedBuilding] = useState("fragmentsCollector");
   const isLoadedRef = useRef(false);
 
   // Initialer React-State für die Ressourcen
@@ -176,9 +180,12 @@ export default function App() {
     });
   };
 
+  const activeBuildingConfig = BUILDINGS[selectedBuilding] || BUILDINGS.fragmentsCollector;
+  const activeBuildingLevel = buildingLevels[selectedBuilding] ?? 0;
+
   return (
-    <div className="site-shell">
-      <main className="game-page">
+    <div className="site-shell" style={{ backgroundColor: "#071010", minHeight: "100vh" }}>
+      <main className="game-page" style={{ maxWidth: "1280px", margin: "0 auto", padding: "20px 24px" }}>
         <ResourceBar
           resources={resources}
           production={production}
@@ -229,14 +236,40 @@ export default function App() {
           </div>
         )}
 
-        <section className="status-panel">
+        <section
+          className="status-panel"
+          style={{
+            backgroundColor: "#0d1b1a",
+            border: "1px solid rgba(168, 213, 202, 0.16)",
+            borderRadius: "16px",
+            padding: "18px 22px",
+            marginBottom: "24px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: "20px",
+          }}
+        >
           <div>
-            <span className="status-panel__label">SYSTEMSTATUS</span>
-            <h2>Kuppelsektor aktiv</h2>
-            <p>
-              Die Stationen laufen autonom im 1-Sekunden-Takt. Speicherstatus:{" "}
+            <span
+              className="status-panel__label"
+              style={{
+                color: "#8ebcb2",
+                fontSize: "0.72rem",
+                fontWeight: "800",
+                letterSpacing: "0.16em",
+              }}
+            >
+              SYSTEMSTATUS
+            </span>
+            <h2 style={{ margin: "4px 0 2px", color: "#ffffff", fontSize: "1.3rem" }}>
+              Kuppelsektor aktiv
+            </h2>
+            <p style={{ margin: 0, color: "#94a3b8", fontSize: "0.85rem" }}>
+              Die Stationen laufen autonom im 1-Sekunden-Takt. Speicher:{" "}
               <strong style={{ color: saveStatus.source === "mongodb" ? "#86efac" : "#67e8f9" }}>
-                {saveStatus.source === "mongodb" ? "MongoDB Atlas / Online" : "Lokaler Speicher"}
+                {saveStatus.source === "mongodb" ? "MongoDB Online" : "Lokaler Browser-Speicher"}
               </strong>
               {saveStatus.lastSaved && (
                 <span> (Zuletzt gespeichert: {saveStatus.lastSaved.toLocaleTimeString("de-DE")})</span>
@@ -244,46 +277,102 @@ export default function App() {
             </p>
           </div>
 
-          <div className="status-panel__capacity">
-            <span>Luftauslastung</span>
-            <strong>
+          <div className="status-panel__capacity" style={{ minWidth: "220px" }}>
+            <span style={{ color: "#9bb9b3", fontSize: "0.8rem", display: "block" }}>
+              Luftauslastung der Kuppel
+            </span>
+            <strong style={{ display: "block", margin: "4px 0", fontSize: "1.35rem", color: "#e0f2fe" }}>
               {usedAir} / {airCapacity}
             </strong>
-            <div className="capacity-bar" aria-hidden="true">
+            <div
+              className="capacity-bar"
+              aria-hidden="true"
+              style={{
+                height: "9px",
+                backgroundColor: "#071010",
+                borderRadius: "999px",
+                overflow: "hidden",
+                border: "1px solid rgba(56, 189, 248, 0.2)",
+              }}
+            >
               <span
                 style={{
-                  width: `${Math.min(
-                    (usedAir / (airCapacity || 1)) * 100,
-                    100,
-                  )}%`,
+                  display: "block",
+                  height: "100%",
+                  width: `${Math.min((usedAir / (airCapacity || 1)) * 100, 100)}%`,
+                  background:
+                    usedAir > airCapacity
+                      ? "#ef4444"
+                      : "linear-gradient(90deg, #38bdf8, #22c55e)",
+                  transition: "width 200ms ease",
                 }}
               />
             </div>
           </div>
         </section>
 
-        <section className="building-grid">
-          <BuildingCard
-            building={BUILDINGS.fragmentsCollector}
-            level={buildingLevels.fragmentsCollector}
-            resources={resources}
-            onUpgrade={() => handleUpgrade("fragmentsCollector")}
+        {/* 2-Spalten Layout: Links/Mitte Fokus-Ansicht, Rechts Gebäude- & Upgrade-Leiste */}
+        <div
+          className="game-workspace-grid"
+          style={{
+            display: "grid",
+            gridTemplateColumns: "minmax(320px, 1.25fr) minmax(300px, 1fr)",
+            gap: "24px",
+            alignItems: "start",
+          }}
+        >
+          {/* Spalte 1 (Mitte/Fokus): 1:1 Bild + Detailansicht */}
+          <BuildingFocusView
+            building={activeBuildingConfig}
+            level={activeBuildingLevel}
           />
 
-          <BuildingCard
-            building={BUILDINGS.dataNode}
-            level={buildingLevels.dataNode}
-            resources={resources}
-            onUpgrade={() => handleUpgrade("dataNode")}
-          />
+          {/* Spalte 2 (Rechts): Vertikale Gebäude- & Upgrade-Liste */}
+          <section
+            className="buildings-sidebar"
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "14px",
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                paddingBottom: "4px",
+              }}
+            >
+              <span
+                style={{
+                  color: "#94a3b8",
+                  fontSize: "0.78rem",
+                  fontWeight: "700",
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >
+                Kuppel-Stationen
+              </span>
+              <span style={{ color: "#64748b", fontSize: "0.74rem" }}>
+                3 Sektoren errichtet
+              </span>
+            </div>
 
-          <BuildingCard
-            building={BUILDINGS.airPurifier}
-            level={buildingLevels.airPurifier}
-            resources={resources}
-            onUpgrade={() => handleUpgrade("airPurifier")}
-          />
-        </section>
+            {BUILDING_KEYS.map((key) => (
+              <BuildingCard
+                key={key}
+                building={BUILDINGS[key]}
+                level={buildingLevels[key]}
+                resources={resources}
+                isSelected={selectedBuilding === key}
+                onSelect={() => setSelectedBuilding(key)}
+                onUpgrade={() => handleUpgrade(key)}
+              />
+            ))}
+          </section>
+        </div>
       </main>
     </div>
   );
