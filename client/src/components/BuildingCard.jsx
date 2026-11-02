@@ -7,12 +7,13 @@ import {
 
 export default function BuildingCard({
   building,
-  level = 0,
+  level: rawLevel = 0,
   resources,
   isSelected = false,
   onSelect,
   onUpgrade,
 }) {
+  const level = typeof rawLevel === "object" && rawLevel !== null ? (rawLevel.level ?? 0) : Number(rawLevel) || 0;
   const currentCost = building?.id ? getUpgradeCost(building.id, level) : {};
 
   const isMaxLevel =

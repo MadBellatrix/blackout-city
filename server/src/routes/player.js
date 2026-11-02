@@ -7,23 +7,37 @@ const router = express.Router();
 // Fallback In-Memory Speicher für Entwicklung ohne laufende MongoDB
 const inMemoryPlayers = new Map();
 
-const getInitialPlayerData = (userId) => ({
-  userId,
+const getInitialPlayerData = (identifier) => ({
+  username: identifier,
+  password: 'defaultPassword123',
   resources: {
     fragments: 100,
     knowledge: 0,
     credits: 0
   },
   buildings: {
-    fragmentsCollector: 0,
-    dataNode: 0,
-    airPurifier: 0,
-    museum: 0
+    fragmentsCollector: { level: 0 },
+    dataNode: { level: 0 },
+    airPurifier: { level: 0 },
+    museum: { level: 0 }
   },
-  lastSaveTime: new Date(),
+  workers: {
+    activeWorkers: 0
+  },
+  lastActive: new Date(),
   createdAt: new Date(),
   updatedAt: new Date()
 });
+
+// Hilfsfunktion zum Finden eines Spielers anhand von ID oder Username
+const findPlayer = async (identifier) => {
+  const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
+  if (isObjectId) {
+    const byId = await Player.findById(identifier);
+    if (byId) return byId;
+  }
+  return Player.findOne({ username: identifier });
+};
 
 // Spielerstand laden (oder initial anlegen, falls noch nicht existent)
 router.get('/player/:userId', async (req, res) => {
@@ -38,7 +52,7 @@ router.get('/player/:userId', async (req, res) => {
     let player = null;
 
     if (isDbConnected) {
-      player = await Player.findOne({ userId });
+      player = await findPlayer(userId);
       if (!player) {
         player = new Player(getInitialPlayerData(userId));
         await player.save();
@@ -51,7 +65,7 @@ router.get('/player/:userId', async (req, res) => {
     }
 
     const now = new Date();
-    const lastSave = player.lastSaveTime ? new Date(player.lastSaveTime) : now;
+    const lastSave = player.lastActive || player.lastSaveTime ? new Date(player.lastActive || player.lastSaveTime) : now;
     const offlineSeconds = Math.max(0, Math.floor((now.getTime() - lastSave.getTime()) / 1000));
 
     res.json({
@@ -79,21 +93,26 @@ router.post('/player/:userId/save', async (req, res) => {
     const now = new Date();
 
     if (isDbConnected) {
-      const updatedPlayer = await Player.findOneAndUpdate(
-        { userId },
-        {
-          $set: {
-            ...(resources && { resources }),
-            ...(buildings && { buildings }),
-            lastSaveTime: now
-          }
-        },
-        { new: true, upsert: true }
-      );
+      let player = await findPlayer(userId);
+
+      if (!player) {
+        player = new Player({
+          ...getInitialPlayerData(userId),
+          ...(resources && { resources }),
+          ...(buildings && { buildings }),
+          lastActive: now
+        });
+      } else {
+        if (resources) player.resources = resources;
+        if (buildings) player.buildings = buildings;
+        player.lastActive = now;
+      }
+
+      await player.save();
 
       return res.json({
         success: true,
-        player: updatedPlayer,
+        player,
         storage: 'mongodb'
       });
     }
@@ -104,7 +123,7 @@ router.post('/player/:userId/save', async (req, res) => {
       ...existing,
       resources: resources || existing.resources,
       buildings: buildings || existing.buildings,
-      lastSaveTime: now,
+      lastActive: now,
       updatedAt: now
     };
     inMemoryPlayers.set(userId, updated);
@@ -128,12 +147,17 @@ router.post('/player/:userId/reset', async (req, res) => {
     const initialData = getInitialPlayerData(userId);
 
     if (isDbConnected) {
-      const resetPlayer = await Player.findOneAndUpdate(
-        { userId },
-        { $set: initialData },
-        { new: true, upsert: true }
-      );
-      return res.json({ success: true, player: resetPlayer, storage: 'mongodb' });
+      let player = await findPlayer(userId);
+      if (!player) {
+        player = new Player(initialData);
+      } else {
+        player.resources = initialData.resources;
+        player.buildings = initialData.buildings;
+        player.workers = initialData.workers;
+        player.lastActive = new Date();
+      }
+      await player.save();
+      return res.json({ success: true, player, storage: 'mongodb' });
     }
 
     inMemoryPlayers.set(userId, initialData);

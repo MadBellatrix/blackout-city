@@ -34,8 +34,10 @@ const BUILDING_ATMOSPHERE = {
   },
 };
 
-export default function BuildingFocusView({ building, level = 0 }) {
+export default function BuildingFocusView({ building, level: rawLevel = 0 }) {
   if (!building) return null;
+
+  const level = typeof rawLevel === "object" && rawLevel !== null ? (rawLevel.level ?? 0) : Number(rawLevel) || 0;
 
   const imageSrc = BUILDING_IMAGES[building.id] || fragmentsammlerImg;
   const atmosphere = BUILDING_ATMOSPHERE[building.id] || {

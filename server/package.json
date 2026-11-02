@@ -2,14 +2,21 @@
   "name": "blackout-city-server",
   "version": "0.1.0",
   "type": "module",
-  "main": "src/server.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node --env-file=.env src/server.js",
-    "dev": "node --env-file=.env --watch src/server.js"
+    "start": "node --env-file=.env server.js",
+    "dev": "node --env-file=.env --watch server.js",
+    "test:routes": "node --env-file=.env scripts/test-routes.js"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "express": "^5.1.0",
+    "express-list-endpoints": "^7.1.1",
+    "jsonwebtoken": "^9.0.3",
     "mongoose": "^8.15.0"
+  },
+  "devDependencies": {
+    "supertest": "^7.3.1"
   }
 }

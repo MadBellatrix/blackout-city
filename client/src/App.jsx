@@ -22,6 +22,13 @@ import {
 
 const BUILDING_KEYS = ["fragmentsCollector", "dataNode", "airPurifier"];
 
+// Hilfsfunktion: Konvertiert Zahl oder { level: number } sicher in eine Zahl
+const extractLevel = (val) => {
+  if (typeof val === "number") return val;
+  if (val && typeof val.level === "number") return val.level;
+  return 0;
+};
+
 export default function App() {
   const [userId] = useState(() => getUserId());
   const [saveStatus, setSaveStatus] = useState({ source: "init", lastSaved: null });
@@ -36,7 +43,7 @@ export default function App() {
     credits: 0,
   });
 
-  // State für die Gebäude-Level
+  // State für die Gebäude-Level (immer flache Zahlen: 0, 1, 2...)
   const [buildingLevels, setBuildingLevels] = useState({
     fragmentsCollector: 0,
     dataNode: 0,
@@ -52,14 +59,21 @@ export default function App() {
       if (isCancelled) return;
 
       const savedPlayer = result.player;
-      let initResources = savedPlayer.resources || { fragments: 100, knowledge: 0, credits: 0 };
-      const initBuildings = savedPlayer.buildings || { fragmentsCollector: 0, dataNode: 0, airPurifier: 0 };
+      let initResources = savedPlayer?.resources || { fragments: 100, knowledge: 0, credits: 0 };
+      const rawBuildings = savedPlayer?.buildings || {};
+
+      // Sicherstellen, dass Level immer eine Zahl ist, selbst wenn das Backend { level: X } liefert
+      const initBuildings = {
+        fragmentsCollector: extractLevel(rawBuildings.fragmentsCollector),
+        dataNode: extractLevel(rawBuildings.dataNode),
+        airPurifier: extractLevel(rawBuildings.airPurifier),
+      };
 
       // Offline-Progression berechnen (maximal 8 Stunden / 28800 Sekunden)
       if (result.offlineSeconds > 5) {
         const cappedSeconds = Math.min(result.offlineSeconds, 8 * 3600);
-        const fragmentsRate = getOutputPerWorker("fragmentsCollector", initBuildings.fragmentsCollector ?? 0);
-        const knowledgeRate = getOutputPerWorker("dataNode", initBuildings.dataNode ?? 0);
+        const fragmentsRate = getOutputPerWorker("fragmentsCollector", initBuildings.fragmentsCollector);
+        const knowledgeRate = getOutputPerWorker("dataNode", initBuildings.dataNode);
 
         const gainedFragments = cappedSeconds * fragmentsRate;
         const gainedKnowledge = cappedSeconds * knowledgeRate;
@@ -83,11 +97,7 @@ export default function App() {
       }
 
       setResources(initResources);
-      setBuildingLevels({
-        fragmentsCollector: initBuildings.fragmentsCollector ?? 0,
-        dataNode: initBuildings.dataNode ?? 0,
-        airPurifier: initBuildings.airPurifier ?? 0,
-      });
+      setBuildingLevels(initBuildings);
 
       setSaveStatus({
         source: result.source,
@@ -153,7 +163,7 @@ export default function App() {
     getAirConsumption("dataNode", buildingLevels.dataNode);
 
   const handleUpgrade = async (buildingId) => {
-    const currentLevel = buildingLevels[buildingId];
+    const currentLevel = extractLevel(buildingLevels[buildingId]);
     const cost = getUpgradeCost(buildingId, currentLevel);
 
     if (!canAfford(resources, cost)) {
@@ -163,7 +173,7 @@ export default function App() {
     const nextResources = subtractCost(resources, cost);
     const nextBuildingLevels = {
       ...buildingLevels,
-      [buildingId]: buildingLevels[buildingId] + 1,
+      [buildingId]: currentLevel + 1,
     };
 
     setResources(nextResources);
@@ -181,7 +191,7 @@ export default function App() {
   };
 
   const activeBuildingConfig = BUILDINGS[selectedBuilding] || BUILDINGS.fragmentsCollector;
-  const activeBuildingLevel = buildingLevels[selectedBuilding] ?? 0;
+  const activeBuildingLevel = extractLevel(buildingLevels[selectedBuilding]);
 
   return (
     <div className="site-shell" style={{ backgroundColor: "#071010", minHeight: "100vh" }}>
@@ -364,7 +374,7 @@ export default function App() {
               <BuildingCard
                 key={key}
                 building={BUILDINGS[key]}
-                level={buildingLevels[key]}
+                level={extractLevel(buildingLevels[key])}
                 resources={resources}
                 isSelected={selectedBuilding === key}
                 onSelect={() => setSelectedBuilding(key)}
