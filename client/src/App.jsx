@@ -5,6 +5,7 @@ import BuildingCard from "./components/BuildingCard";
 import BuildingFocusView from "./components/BuildingFocusView";
 import ResourceBar from "./components/ResourceBar";
 import AuthModal from "./components/AuthModal";
+import LandingPage from "./components/LandingPage";
 import { BUILDINGS } from "./utils/gameBalance";
 import {
   canAfford,
@@ -60,8 +61,13 @@ export default function App() {
     airPurifier: 0,
   });
 
-  // 1. Spielstand beim Start laden (Phase 2: Persistenz)
+  // 1. Spielstand beim Start laden: Nur wenn ein Benutzer eingeloggt ist
   useEffect(() => {
+    if (!currentUser) {
+      isLoadedRef.current = false;
+      return;
+    }
+
     let isCancelled = false;
 
     async function initGame() {
@@ -137,8 +143,10 @@ export default function App() {
     };
   }, [buildingLevels.fragmentsCollector, buildingLevels.dataNode]);
 
-  // 2. Game Loop (jede Sekunde / 1000ms)
+  // 2. Game Loop (jede Sekunde / 1000ms): Nur aktiv, wenn angemeldet
   useEffect(() => {
+    if (!currentUser) return;
+
     const timer = window.setInterval(() => {
       setResources((currentResources) => ({
         ...currentResources,
@@ -149,10 +157,12 @@ export default function App() {
     }, 1000);
 
     return () => window.clearInterval(timer);
-  }, [production]);
+  }, [currentUser, production]);
 
-  // 3. Autosave alle 15 Sekunden (Phase 2: Persistenz)
+  // 3. Autosave alle 15 Sekunden (Phase 2: Persistenz): Nur aktiv, wenn angemeldet
   useEffect(() => {
+    if (!currentUser) return;
+
     const saveTimer = window.setInterval(async () => {
       if (!isLoadedRef.current) return;
       const targetId = currentUser?.username || currentUser?.id || userId;
@@ -167,7 +177,7 @@ export default function App() {
     }, 15000);
 
     return () => window.clearInterval(saveTimer);
-  }, [userId, currentUser, resources, buildingLevels]);
+  }, [currentUser, userId, resources, buildingLevels]);
 
   const airCapacity = getAirCapacity(buildingLevels.airPurifier);
   const usedAir =
@@ -226,20 +236,43 @@ export default function App() {
     localStorage.removeItem("blackout_token");
     localStorage.removeItem("blackout_player");
     setCurrentUser(null);
+    setOfflineNotice(null);
+    isLoadedRef.current = false;
+    setResources({
+      fragments: 100,
+      knowledge: 0,
+      credits: 0,
+    });
+    setBuildingLevels({
+      fragmentsCollector: 0,
+      dataNode: 0,
+      airPurifier: 0,
+    });
   };
 
   const activeBuildingConfig = BUILDINGS[selectedBuilding] || BUILDINGS.fragmentsCollector;
   const activeBuildingLevel = extractLevel(buildingLevels[selectedBuilding]);
 
   return (
+    <>
     <div className="site-shell" style={{ backgroundColor: "#071010", minHeight: "100vh" }}>
-      <main className="game-page" style={{ maxWidth: "1280px", margin: "0 auto", padding: "20px 24px" }}>
-        <ResourceBar
-          resources={resources}
-          production={production}
-          usedAir={usedAir}
-          airCapacity={airCapacity}
-        />
+      {!currentUser ? (
+        <>
+          <LandingPage onOpenAuth={() => setIsAuthModalOpen(true)} />
+          <AuthModal
+            isOpen={isAuthModalOpen}
+            onClose={() => setIsAuthModalOpen(false)}
+            onAuthSuccess={handleAuthSuccess}
+          />
+        </>
+      ) : (
+        <main className="game-page" style={{ maxWidth: "1280px", margin: "0 auto", padding: "20px 24px" }}>
+          <ResourceBar
+            resources={resources}
+            production={production}
+            usedAir={usedAir}
+            airCapacity={airCapacity}
+          />
 
         {offlineNotice && (
           <div
@@ -485,6 +518,8 @@ export default function App() {
           onAuthSuccess={handleAuthSuccess}
         />
       </main>
+      )}
     </div>
+    </>
   );
 }
