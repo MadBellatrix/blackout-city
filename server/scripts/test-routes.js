@@ -7,6 +7,7 @@ function extractEndpoints(expressApp) {
   const routes = [];
   const knownPrefixes = [
     { prefix: '/api/auth', match: (p) => p.includes('login') || p.includes('register') },
+    { prefix: '/api/game', match: (p) => p === '/state' || (p.includes('save') && !p.includes('player')) },
     { prefix: '/api', match: (p) => p.includes('player') }
   ];
 

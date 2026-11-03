@@ -3,6 +3,7 @@ import cors from 'cors';
 import connectDB from './src/config/db.js';
 import playerRoutes from './src/routes/player.js';
 import authRoutes from './src/routes/authRoutes.js';
+import gameRoutes from './src/routes/gameRoutes.js';
 
 // Umgebungsvariablen (werden über native Node.js --env-file=.env geladen)
 const PORT = process.env.PORT || 5000;
@@ -15,6 +16,7 @@ app.use(express.json());
 
 // API-Routen registrieren
 app.use('/api/auth', authRoutes);
+app.use('/api/game', gameRoutes);
 app.use('/api', playerRoutes);
 
 // Health-Check Route
@@ -36,6 +38,10 @@ app.get('/', (req, res) => {
       auth: {
         register: 'POST /api/auth/register',
         login: 'POST /api/auth/login'
+      },
+      game: {
+        state: 'GET /api/game/state',
+        save: 'POST /api/game/save'
       },
       player: '/api/player/:userId'
     }
