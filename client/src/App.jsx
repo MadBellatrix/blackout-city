@@ -4,6 +4,7 @@ import "./index.css";
 import BuildingCard from "./components/BuildingCard";
 import BuildingFocusView from "./components/BuildingFocusView";
 import ResourceBar from "./components/ResourceBar";
+import AuthModal from "./components/AuthModal";
 import { BUILDINGS } from "./utils/gameBalance";
 import {
   canAfford,
@@ -30,7 +31,16 @@ const extractLevel = (val) => {
 };
 
 export default function App() {
-  const [userId] = useState(() => getUserId());
+  const [userId, setUserId] = useState(() => getUserId());
+  const [currentUser, setCurrentUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem("blackout_player");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [saveStatus, setSaveStatus] = useState({ source: "init", lastSaved: null });
   const [offlineNotice, setOfflineNotice] = useState(null);
   const [selectedBuilding, setSelectedBuilding] = useState("fragmentsCollector");
@@ -55,14 +65,15 @@ export default function App() {
     let isCancelled = false;
 
     async function initGame() {
-      const result = await loadPlayerState(userId);
+      const targetId = currentUser?.username || currentUser?.id || userId;
+      const result = await loadPlayerState(targetId);
       if (isCancelled) return;
 
       const savedPlayer = result.player;
       let initResources = savedPlayer?.resources || { fragments: 100, knowledge: 0, credits: 0 };
       const rawBuildings = savedPlayer?.buildings || {};
 
-      // Sicherstellen, dass Level immer eine Zahl ist, selbst wenn das Backend { level: X } liefert
+      // Sicherstellen, dass Level immer eine Zahl ist
       const initBuildings = {
         fragmentsCollector: extractLevel(rawBuildings.fragmentsCollector),
         dataNode: extractLevel(rawBuildings.dataNode),
@@ -112,7 +123,7 @@ export default function App() {
     return () => {
       isCancelled = true;
     };
-  }, [userId]);
+  }, [userId, currentUser]);
 
   // Produktion pro Sekunde berechnen
   const production = useMemo(() => {
@@ -144,7 +155,8 @@ export default function App() {
   useEffect(() => {
     const saveTimer = window.setInterval(async () => {
       if (!isLoadedRef.current) return;
-      const res = await savePlayerState(userId, {
+      const targetId = currentUser?.username || currentUser?.id || userId;
+      const res = await savePlayerState(targetId, {
         resources,
         buildings: buildingLevels,
       });
@@ -155,7 +167,7 @@ export default function App() {
     }, 15000);
 
     return () => window.clearInterval(saveTimer);
-  }, [userId, resources, buildingLevels]);
+  }, [userId, currentUser, resources, buildingLevels]);
 
   const airCapacity = getAirCapacity(buildingLevels.airPurifier);
   const usedAir =
@@ -180,7 +192,8 @@ export default function App() {
     setBuildingLevels(nextBuildingLevels);
 
     // Direkt nach dem Upgrade speichern
-    const res = await savePlayerState(userId, {
+    const targetId = currentUser?.username || currentUser?.id || userId;
+    const res = await savePlayerState(targetId, {
       resources: nextResources,
       buildings: nextBuildingLevels,
     });
@@ -188,6 +201,31 @@ export default function App() {
       source: res.source,
       lastSaved: new Date(),
     });
+  };
+
+  const handleAuthSuccess = (data) => {
+    if (data.player) {
+      setCurrentUser(data.player);
+      if (data.player.username) {
+        setUserId(data.player.username);
+      }
+      if (data.player.resources) {
+        setResources(data.player.resources);
+      }
+      if (data.player.buildings) {
+        setBuildingLevels({
+          fragmentsCollector: extractLevel(data.player.buildings.fragmentsCollector),
+          dataNode: extractLevel(data.player.buildings.dataNode),
+          airPurifier: extractLevel(data.player.buildings.airPurifier),
+        });
+      }
+    }
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("blackout_token");
+    localStorage.removeItem("blackout_player");
+    setCurrentUser(null);
   };
 
   const activeBuildingConfig = BUILDINGS[selectedBuilding] || BUILDINGS.fragmentsCollector;
@@ -262,17 +300,29 @@ export default function App() {
           }}
         >
           <div>
-            <span
-              className="status-panel__label"
-              style={{
-                color: "#8ebcb2",
-                fontSize: "0.72rem",
-                fontWeight: "800",
-                letterSpacing: "0.16em",
-              }}
-            >
-              SYSTEMSTATUS
-            </span>
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "4px" }}>
+              <span
+                className="status-panel__label"
+                style={{
+                  color: "#8ebcb2",
+                  fontSize: "0.72rem",
+                  fontWeight: "800",
+                  letterSpacing: "0.16em",
+                }}
+              >
+                SYSTEMSTATUS
+              </span>
+              {currentUser ? (
+                <span style={{ color: "#38bdf8", fontSize: "0.75rem", fontWeight: "600" }}>
+                  👤 Angemeldet als: <strong>{currentUser.username}</strong>
+                </span>
+              ) : (
+                <span style={{ color: "#94a3b8", fontSize: "0.75rem" }}>
+                  Gast-Modus
+                </span>
+              )}
+            </div>
+
             <h2 style={{ margin: "4px 0 2px", color: "#ffffff", fontSize: "1.3rem" }}>
               Kuppelsektor aktiv
             </h2>
@@ -287,36 +337,80 @@ export default function App() {
             </p>
           </div>
 
-          <div className="status-panel__capacity" style={{ minWidth: "220px" }}>
-            <span style={{ color: "#9bb9b3", fontSize: "0.8rem", display: "block" }}>
-              Luftauslastung der Kuppel
-            </span>
-            <strong style={{ display: "block", margin: "4px 0", fontSize: "1.35rem", color: "#e0f2fe" }}>
-              {usedAir} / {airCapacity}
-            </strong>
-            <div
-              className="capacity-bar"
-              aria-hidden="true"
-              style={{
-                height: "9px",
-                backgroundColor: "#071010",
-                borderRadius: "999px",
-                overflow: "hidden",
-                border: "1px solid rgba(56, 189, 248, 0.2)",
-              }}
-            >
-              <span
+          <div style={{ display: "flex", alignItems: "center", gap: "20px", flexWrap: "wrap" }}>
+            <div className="status-panel__capacity" style={{ minWidth: "180px" }}>
+              <span style={{ color: "#9bb9b3", fontSize: "0.8rem", display: "block" }}>
+                Luftauslastung der Kuppel
+              </span>
+              <strong style={{ display: "block", margin: "4px 0", fontSize: "1.35rem", color: "#e0f2fe" }}>
+                {usedAir} / {airCapacity}
+              </strong>
+              <div
+                className="capacity-bar"
+                aria-hidden="true"
                 style={{
-                  display: "block",
-                  height: "100%",
-                  width: `${Math.min((usedAir / (airCapacity || 1)) * 100, 100)}%`,
-                  background:
-                    usedAir > airCapacity
-                      ? "#ef4444"
-                      : "linear-gradient(90deg, #38bdf8, #22c55e)",
-                  transition: "width 200ms ease",
+                  height: "9px",
+                  backgroundColor: "#071010",
+                  borderRadius: "999px",
+                  overflow: "hidden",
+                  border: "1px solid rgba(56, 189, 248, 0.2)",
                 }}
-              />
+              >
+                <span
+                  style={{
+                    display: "block",
+                    height: "100%",
+                    width: `${Math.min((usedAir / (airCapacity || 1)) * 100, 100)}%`,
+                    background:
+                      usedAir > airCapacity
+                        ? "#ef4444"
+                        : "linear-gradient(90deg, #38bdf8, #22c55e)",
+                    transition: "width 200ms ease",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Auth Buttons */}
+            <div>
+              {currentUser ? (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  style={{
+                    backgroundColor: "transparent",
+                    border: "1px solid #334155",
+                    color: "#94a3b8",
+                    padding: "8px 14px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    fontSize: "0.82rem",
+                    fontWeight: "600",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  Abmelden
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsAuthModalOpen(true)}
+                  style={{
+                    backgroundColor: "rgba(6, 182, 212, 0.12)",
+                    border: "1px solid #06b6d4",
+                    color: "#06b6d4",
+                    padding: "8px 16px",
+                    borderRadius: "8px",
+                    cursor: "pointer",
+                    fontSize: "0.84rem",
+                    fontWeight: "700",
+                    boxShadow: "0 0 12px rgba(6, 182, 212, 0.2)",
+                    transition: "all 0.2s",
+                  }}
+                >
+                  Login / Registrieren
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -383,6 +477,13 @@ export default function App() {
             ))}
           </section>
         </div>
+
+        {/* Modales Login/Register-Fenster */}
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onAuthSuccess={handleAuthSuccess}
+        />
       </main>
     </div>
   );
