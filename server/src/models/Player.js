@@ -10,10 +10,27 @@ const playerSchema = new mongoose.Schema(
       trim: true,
       minlength: [3, 'Benutzername muss mindestens 3 Zeichen lang sein'],
     },
+    email: {
+      type: String,
+      required: [true, 'E-Mail-Adresse ist erforderlich'],
+      unique: true,
+      trim: true,
+      lowercase: true,
+    },
     password: {
       type: String,
       required: [true, 'Passwort ist erforderlich'],
       minlength: [6, 'Passwort muss mindestens 6 Zeichen lang sein'],
+    },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    verificationToken: {
+      type: String,
+    },
+    verificationTokenExpires: {
+      type: Date,
     },
     resources: {
       fragments: {

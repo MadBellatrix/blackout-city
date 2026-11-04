@@ -1,10 +1,9 @@
-# MongoDB Connection String
-# Lokal: mongodb://localhost:27017/blackout-city
-# Atlas: mongodb+srv://<user>:<password>@cluster.mongodb.net/blackout-city
-MONGODB_URI=mongodb://localhost:27017/blackout-city
+PORT=
+MONGO_URI=
+NODE_ENV=
+JWT_SECRET=
 
-# Server Port
-PORT=3000
-
-# Optional: JWT Secret für spätere Auth
-JWT_SECRET=change-me-in-production
+RESEND_API_KEY=
+EMAIL_FROM=
+CLIENT_URL=
+VITE_BETA_ACCESS_PASSWORD=

@@ -3,20 +3,28 @@ import React, { useState } from 'react';
 const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
+  const [successMessage, setSuccessMessage] = useState(null);
   const [loading, setLoading] = useState(false);
 
   if (!isOpen) return null;
 
+  const handleTabChange = (loginMode) => {
+    setIsLogin(loginMode);
+    setError(null);
+    setSuccessMessage(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
+    setSuccessMessage(null);
     setLoading(true);
 
-    const endpoint = isLogin
-      ? 'http://localhost:5000/api/auth/login'
-      : 'http://localhost:5000/api/auth/register';
+    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+    const payload = isLogin ? { username, password } : { username, email, password };
 
     try {
       const response = await fetch(endpoint, {
@@ -24,23 +32,32 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify(payload),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || data.message || 'Authentifizierung fehlgeschlagen');
+        throw new Error(data.error || data.message || 'Aktion fehlgeschlagen');
       }
 
-      // Token und Spielerdaten im LocalStorage sichern
-      localStorage.setItem('blackout_token', data.token);
-      localStorage.setItem('blackout_player', JSON.stringify(data.player));
-
-      if (onAuthSuccess) {
-        onAuthSuccess(data);
+      if (isLogin) {
+        // Erfolgreicher Login: Token sichern und Kuppel betreten
+        localStorage.setItem('blackout_token', data.token);
+        localStorage.setItem('blackout_player', JSON.stringify(data.player));
+        if (onAuthSuccess) {
+          onAuthSuccess(data);
+        }
+        onClose();
+      } else {
+        // Erfolgreiche Registrierung: Hinweis auf Aktivierungs-Mail
+        setSuccessMessage(
+          data.message || 'Registrierung erfolgreich! Bitte überprüfe dein Postfach, um deine Bürger-ID zu bestätigen.'
+        );
+        setUsername('');
+        setEmail('');
+        setPassword('');
       }
-      onClose();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -51,7 +68,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   return (
     <div style={styles.overlay}>
       <div style={styles.modal}>
-        {/* Header mit Tabs */}
+        {/* Header Tabs */}
         <div style={styles.tabContainer}>
           <button
             type="button"
@@ -59,10 +76,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
               ...styles.tab,
               ...(isLogin ? styles.activeTab : {}),
             }}
-            onClick={() => {
-              setIsLogin(true);
-              setError(null);
-            }}
+            onClick={() => handleTabChange(true)}
           >
             Anmelden
           </button>
@@ -72,23 +86,36 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
               ...styles.tab,
               ...(!isLogin ? styles.activeTab : {}),
             }}
-            onClick={() => {
-              setIsLogin(false);
-              setError(null);
-            }}
+            onClick={() => handleTabChange(false)}
           >
             Registrieren
           </button>
         </div>
 
-        {/* Formular */}
+        {/* Formular-Bereich */}
         <form onSubmit={handleSubmit} style={styles.form}>
           <h2 style={styles.title}>
-            {isLogin ? 'Kommandant-Login' : 'Neuer Kommandant'}
+            {isLogin ? 'Kommandant-Login' : 'Bürger-Registrierung'}
           </h2>
 
           {error && <div style={styles.errorBox}>{error}</div>}
 
+          {/* Erfolgs-Box bei Registrierung */}
+          {!isLogin && successMessage && (
+            <div style={styles.successBox}>
+              <div style={styles.successTitle}>Bestätigung erforderlich</div>
+              <p style={styles.successText}>{successMessage}</p>
+              <button
+                type="button"
+                style={styles.switchTabBtn}
+                onClick={() => handleTabChange(true)}
+              >
+                Zum Login wechseln
+              </button>
+            </div>
+          )}
+
+          {/* Eingabefelder */}
           <div style={styles.inputGroup}>
             <label style={styles.label} htmlFor="auth-username">
               Benutzername
@@ -99,12 +126,30 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
               style={styles.input}
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              placeholder="z.B. Raven"
+              placeholder="z. B. Raven"
               required
               minLength={3}
               autoComplete="username"
             />
           </div>
+
+          {!isLogin && (
+            <div style={styles.inputGroup}>
+              <label style={styles.label} htmlFor="auth-email">
+                E-Mail-Adresse
+              </label>
+              <input
+                id="auth-email"
+                type="email"
+                style={styles.input}
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="z. B. bürger@blackout-city.de"
+                required
+                autoComplete="email"
+              />
+            </div>
+          )}
 
           <div style={styles.inputGroup}>
             <label style={styles.label} htmlFor="auth-password">
@@ -119,7 +164,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
               placeholder="••••••••"
               required
               minLength={6}
-              autoComplete={isLogin ? "current-password" : "new-password"}
+              autoComplete={isLogin ? 'current-password' : 'new-password'}
             />
           </div>
 
@@ -140,7 +185,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
               }}
             >
               {loading
-                ? 'Wird geladen...'
+                ? 'Wird verarbeitet...'
                 : isLogin
                 ? 'Anmelden'
                 : 'Registrieren'}
@@ -152,7 +197,6 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   );
 };
 
-// Dark-Theme Styling gemäß Designvorgaben
 const styles = {
   overlay: {
     position: 'fixed',
@@ -170,10 +214,10 @@ const styles = {
   modal: {
     backgroundColor: '#0f172a',
     border: '1px solid #1e293b',
-    boxShadow: '0 0 25px rgba(6, 182, 212, 0.15)',
+    boxShadow: '0 0 30px rgba(6, 182, 212, 0.15)',
     borderRadius: '12px',
     width: '100%',
-    maxWidth: '420px',
+    maxWidth: '440px',
     overflow: 'hidden',
     color: '#e2e8f0',
   },
@@ -194,7 +238,7 @@ const styles = {
   },
   activeTab: {
     backgroundColor: '#0f172a',
-    color: '#06b6d4', // Cyan Akzent
+    color: '#06b6d4',
     borderBottom: '2px solid #06b6d4',
   },
   form: {
@@ -229,9 +273,40 @@ const styles = {
     backgroundColor: 'rgba(239, 68, 68, 0.15)',
     border: '1px solid #ef4444',
     color: '#fca5a5',
-    padding: '10px',
+    padding: '10px 12px',
     borderRadius: '6px',
     marginBottom: '16px',
+    fontSize: '0.85rem',
+  },
+  successBox: {
+    backgroundColor: 'rgba(34, 197, 94, 0.1)',
+    border: '1px solid #22c55e',
+    color: '#86efac',
+    padding: '16px',
+    borderRadius: '8px',
+    textAlign: 'center',
+    marginBottom: '16px',
+  },
+  successTitle: {
+    fontWeight: 'bold',
+    fontSize: '1rem',
+    marginBottom: '6px',
+    color: '#22c55e',
+  },
+  successText: {
+    fontSize: '0.85rem',
+    color: '#cbd5e1',
+    lineHeight: '1.4',
+    margin: '0 0 12px 0',
+  },
+  switchTabBtn: {
+    backgroundColor: '#22c55e',
+    color: '#020617',
+    border: 'none',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    fontWeight: 'bold',
+    cursor: 'pointer',
     fontSize: '0.85rem',
   },
   buttonGroup: {

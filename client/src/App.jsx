@@ -6,6 +6,8 @@ import BuildingFocusView from "./components/BuildingFocusView";
 import ResourceBar from "./components/ResourceBar";
 import AuthModal from "./components/AuthModal";
 import LandingPage from "./components/LandingPage";
+import BetaGate from "./components/BetaGate";
+import VerifyEmail from "./components/VerifyEmail";
 import { BUILDINGS } from "./utils/gameBalance";
 import {
   canAfford,
@@ -32,6 +34,12 @@ const extractLevel = (val) => {
 };
 
 export default function App() {
+  const [hasBetaAccess, setHasBetaAccess] = useState(
+    () => localStorage.getItem("blackout_beta_access") === "granted"
+  );
+  const [isVerifyingEmail, setIsVerifyingEmail] = useState(
+    () => window.location.pathname === "/verify-email" || new URLSearchParams(window.location.search).has("token")
+  );
   const [userId, setUserId] = useState(() => getUserId());
   const [currentUser, setCurrentUser] = useState(() => {
     try {
@@ -252,6 +260,23 @@ export default function App() {
 
   const activeBuildingConfig = BUILDINGS[selectedBuilding] || BUILDINGS.fragmentsCollector;
   const activeBuildingLevel = extractLevel(buildingLevels[selectedBuilding]);
+
+  // Verifizierungs-Screen anzeigen, falls Benutzer über den E-Mail-Link kommt
+  if (isVerifyingEmail) {
+    return (
+      <VerifyEmail
+        onBackToLanding={() => {
+          setIsVerifyingEmail(false);
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }}
+      />
+    );
+  }
+
+  // Beta-Vorschaltseite: Zeigen, solange kein Tester-Zugriff besteht
+  if (!hasBetaAccess) {
+    return <BetaGate onAccessGranted={() => setHasBetaAccess(true)} />;
+  }
 
   return (
     <>
