@@ -116,7 +116,38 @@ export const login = async (req, res) => {
   }
 };
 
+// E-Mail-Bestätigung verarbeiten
+export const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const player = await Player.findOne({
+      verificationToken: token,
+      verificationTokenExpires: { $gt: Date.now() },
+    });
+
+    if (!player) {
+      return res.status(400).json({
+        message: 'Der Bestätigungslink ist ungültig oder bereits abgelaufen.',
+      });
+    }
+
+    // Spieler freischalten & Token entwerten
+    player.isVerified = true;
+    player.verificationToken = undefined;
+    player.verificationTokenExpires = undefined;
+    await player.save();
+
+    res.status(200).json({
+      message: 'Bürger-ID erfolgreich verifiziert! Du kannst die Kuppel jetzt betreten.',
+      username: player.username,
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Serverfehler bei der Verifizierung.', error: error.message });
+  }
+};
+
 export default {
   register,
-  login
+  login,
+  verifyEmail
 };
