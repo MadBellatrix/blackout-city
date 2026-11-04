@@ -34,9 +34,7 @@ const extractLevel = (val) => {
 };
 
 export default function App() {
-  const [hasBetaAccess, setHasBetaAccess] = useState(
-    () => localStorage.getItem("blackout_beta_access") === "granted"
-  );
+  const [hasBetaAccess, setHasBetaAccess] = useState(false);
   const [isVerifyingEmail, setIsVerifyingEmail] = useState(
     () => window.location.pathname === "/verify-email" || new URLSearchParams(window.location.search).has("token")
   );

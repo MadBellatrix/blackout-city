@@ -11,7 +11,6 @@ const BetaGate = ({ onAccessGranted }) => {
     const validPassword = import.meta.env.VITE_BETA_ACCESS_PASSWORD || 'Kuppel2026';
 
     if (accessCode.trim() === validPassword) {
-      localStorage.setItem('blackout_beta_access', 'granted');
       if (onAccessGranted) {
         onAccessGranted();
       }
