@@ -6,6 +6,7 @@ import connectDB from './src/config/db.js';
 import playerRoutes from './src/routes/player.js';
 import authRoutes from './src/routes/authRoutes.js';
 import gameRoutes from './src/routes/gameRoutes.js';
+import { initDiscordBot } from './src/services/discordBot.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -60,6 +61,7 @@ const isDirectRun =
 
 if (isDirectRun) {
   await connectDB();
+  await initDiscordBot();
   app.listen(PORT, () => {
     console.log(`✓ Server läuft auf Port ${PORT}`);
     console.log(`✓ API Health-Check: http://localhost:${PORT}/api/health`);

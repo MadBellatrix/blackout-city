@@ -26,6 +26,11 @@ const playerSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    hasBetaAccess: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     verificationToken: {
       type: String,
     },

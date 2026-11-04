@@ -7,3 +7,6 @@ RESEND_API_KEY=
 EMAIL_FROM=
 CLIENT_URL=
 VITE_BETA_ACCESS_PASSWORD=
+
+DISCORD_BOT_TOKEN=hier_dein_kopiertes_bot_token
+DISCORD_CLIENT_ID=hier_deine_kopierte_application_id
