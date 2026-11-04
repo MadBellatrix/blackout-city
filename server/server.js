@@ -1,9 +1,15 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import connectDB from './src/config/db.js';
 import playerRoutes from './src/routes/player.js';
 import authRoutes from './src/routes/authRoutes.js';
 import gameRoutes from './src/routes/gameRoutes.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const CLIENT_DIST_PATH = path.resolve(__dirname, '../client/dist');
 
 // Umgebungsvariablen (werden über native Node.js --env-file=.env geladen)
 const PORT = process.env.PORT || 5000;
@@ -28,22 +34,21 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Basis-Route
-app.get('/', (req, res) => {
-  res.json({
-    name: 'Blackout City API',
-    version: '0.1.0',
-    endpoints: {
-      health: '/api/health',
-      auth: {
-        register: 'POST /api/auth/register',
-        login: 'POST /api/auth/login'
-      },
-      game: {
-        state: 'GET /api/game/state',
-        save: 'POST /api/game/save'
-      },
-      player: '/api/player/:userId'
+// Single-Service-Deployment: Statische Frontend-Dateien aus client/dist ausliefern
+app.use(express.static(CLIENT_DIST_PATH));
+
+// SPA-Fallback: Alle nicht durch die API abgedeckten Routen erhalten index.html
+app.get('{*path}', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  res.sendFile(path.join(CLIENT_DIST_PATH, 'index.html'), (err) => {
+    if (err) {
+      res.status(200).json({
+        name: 'Blackout City API',
+        version: '0.1.0',
+        notice: 'Frontend dist not built yet. Run npm run build in client directory.'
+      });
     }
   });
 });

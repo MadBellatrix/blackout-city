@@ -1,5 +1,7 @@
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import Player from '../models/Player.js';
+import { sendVerificationEmail } from '../services/emailService.js';
 
 // Hilfsfunktion: Token generieren (7 Tage Gültigkeit)
 const generateToken = (id) => {
@@ -9,56 +11,75 @@ const generateToken = (id) => {
 // Registrierung
 export const register = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, email, password } = req.body;
 
-    // Validierung: Beide Felder erforderlich
-    if (!username || !password) {
+    // Validierung: Alle Felder erforderlich
+    if (!username || !email || !password) {
       return res.status(400).json({
-        error: 'Benutzername und Passwort sind erforderlich.'
+        message: 'Benutzername, E-Mail-Adresse und Passwort sind erforderlich.'
       });
     }
 
     // Validierung: Username min. 3 Zeichen
     if (username.trim().length < 3) {
       return res.status(400).json({
-        error: 'Der Benutzername muss mindestens 3 Zeichen lang sein.'
+        message: 'Der Benutzername muss mindestens 3 Zeichen lang sein.'
       });
     }
 
     // Prüfen, ob Benutzername bereits existiert
-    const existingPlayer = await Player.findOne({ username: username.trim() });
-    if (existingPlayer) {
+    const existingPlayerByUsername = await Player.findOne({ username: username.trim() });
+    if (existingPlayerByUsername) {
       return res.status(400).json({
-        error: 'Dieser Benutzername ist bereits vergeben.'
+        message: 'Dieser Benutzername ist bereits vergeben.'
       });
     }
 
-    // Neuen Spieler anlegen (Standardwerte für Ressourcen etc. greifen aus dem Schema)
+    // Prüfen, ob E-Mail-Adresse bereits existiert
+    const existingPlayerByEmail = await Player.findOne({ email: email.trim().toLowerCase() });
+    if (existingPlayerByEmail) {
+      return res.status(400).json({
+        message: 'Diese E-Mail-Adresse ist bereits registriert.'
+      });
+    }
+
+    // Verifizierungs-Token generieren (24h Gültigkeit)
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    // Neuen Spieler anlegen
     const player = new Player({
       username: username.trim(),
-      password
+      email: email.trim().toLowerCase(),
+      password,
+      isVerified: false,
+      verificationToken,
+      verificationTokenExpires,
     });
 
     await player.save();
 
-    const token = generateToken(player._id);
+    // Verifizierungs-E-Mail versenden
+    await sendVerificationEmail({
+      email: player.email,
+      username: player.username,
+      token: verificationToken,
+    });
 
     return res.status(201).json({
-      token,
+      message: 'Registrierung erfolgreich! Bitte überprüfe dein Postfach, um deine Bürger-ID zu bestätigen.',
       player: {
         id: player._id,
         username: player.username,
-        resources: player.resources,
-        buildings: player.buildings,
-        workers: player.workers,
-        lastActive: player.lastActive
+        email: player.email,
+        isVerified: player.isVerified,
       }
     });
   } catch (error) {
     console.error('Fehler bei der Registrierung:', error);
     return res.status(500).json({
-      error: 'Interner Serverfehler bei der Registrierung.',
-      details: error.message
+      message: 'Interner Serverfehler bei der Registrierung.',
+      error: error.message
     });
   }
 };
@@ -78,7 +99,7 @@ export const login = async (req, res) => {
     const player = await Player.findOne({ username: username.trim() });
     if (!player) {
       return res.status(401).json({
-        error: 'Ungültige Anmeldedaten.'
+        message: 'Ungültige Anmeldedaten.'
       });
     }
 
@@ -86,7 +107,14 @@ export const login = async (req, res) => {
     const isMatch = await player.comparePassword(password);
     if (!isMatch) {
       return res.status(401).json({
-        error: 'Ungültige Anmeldedaten.'
+        message: 'Ungültige Anmeldedaten.'
+      });
+    }
+
+    // E-Mail-Verifizierung prüfen
+    if (!player.isVerified) {
+      return res.status(403).json({
+        message: 'Deine Bürger-ID wurde noch nicht bestätigt. Bitte überprüfe deine E-Mails.'
       });
     }
 
