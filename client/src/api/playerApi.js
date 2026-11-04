@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:5000/api";
+const API_BASE_URL = "/api";
 const USER_ID_KEY = "blackout_city_user_id";
 const LOCAL_STORAGE_KEY = "blackout_city_savegame";
 
