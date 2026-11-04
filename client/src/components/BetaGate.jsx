@@ -1,61 +1,96 @@
 import React, { useState } from 'react';
 
-const BetaGate = ({ onAccessGranted }) => {
-  const [accessCode, setAccessCode] = useState('');
-  const [error, setError] = useState('');
+const BetaGate = ({ onAccessGranted, onLogout, username }) => {
+  const [code, setCode] = useState('');
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
+    setError(null);
+    setLoading(true);
 
-    const validPassword = import.meta.env.VITE_BETA_ACCESS_PASSWORD || 'Kuppel2026';
+    const token = localStorage.getItem('blackout_token');
 
-    if (accessCode.trim() === validPassword) {
-      if (onAccessGranted) {
-        onAccessGranted();
+    try {
+      const response = await fetch('/api/auth/redeem-beta', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ code: code.trim().toUpperCase() }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Autorisierung fehlgeschlagen.');
       }
-    } else {
-      setError('Zugang verweigert: Ungültiger Sicherheitscode');
+
+      // Spielerdaten im localStorage aktualisieren
+      if (data.player) {
+        localStorage.setItem('blackout_player', JSON.stringify(data.player));
+      }
+
+      onAccessGranted(data.player);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.card}>
-        <div style={styles.badge}>BLACKOUT-CITY // GESCHLOSSENE TEST-PHASE</div>
-
-        <h1 style={styles.heading}>Sicherheitsschleuse Sektor 01</h1>
-
-        <p style={styles.text}>
-          Der Zutritt zur Biosphäre ist aktuell autorisierten Testern vorbehalten. Bitte gib den Zugangscode ein, um das Schleusentor zu öffnen.
+    <div style={styles.overlay}>
+      <div style={styles.terminalCard}>
+        <div style={styles.badge}>BLACKOUT-CITY // AUTORISIERUNGSTERMINAL</div>
+        <h1 style={styles.title}>Kuppel-Schleuse Verriegelt</h1>
+        <p style={styles.subtext}>
+          Bürger-ID <strong>{username || 'Unbekannt'}</strong> authentifiziert. Zur Dekompression und Zuteilung von Sauerstoffkontingenten wird ein gültiger <strong>Closed-Beta-Sicherheitscode</strong> benötigt.
         </p>
 
         {error && <div style={styles.errorBox}>{error}</div>}
 
-        <form onSubmit={handleSubmit} style={styles.form}>
+        <form onSubmit={handleSubmit}>
           <div style={styles.inputGroup}>
-            <label style={styles.label} htmlFor="beta-code">
-              Autorisierungs-Code
+            <label style={styles.label} htmlFor="beta-code-input">
+              Sicherheitscode eingeben
             </label>
             <input
-              id="beta-code"
-              type="password"
+              id="beta-code-input"
+              type="text"
               style={styles.input}
-              value={accessCode}
-              onChange={(e) => setAccessCode(e.target.value)}
-              placeholder="Zugangscode eingeben..."
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="BC-XXXX-XXXX"
               autoFocus
               required
+              disabled={loading}
             />
           </div>
 
-          <button type="submit" style={styles.submitBtn}>
-            Schleuse entriegeln
+          <button
+            type="submit"
+            disabled={loading}
+            style={{
+              ...styles.submitBtn,
+              ...(loading ? styles.btnDisabled : {}),
+            }}
+          >
+            {loading ? 'Autorisiere...' : 'Schleuse Entriegeln'}
           </button>
         </form>
 
-        <div style={styles.footerNote}>
-          SICHERHEITSSTUFE: KLASSIFIZIERT · PROTOKOLL 2026
+        <div style={styles.footer}>
+          <p style={styles.hint}>Codes werden manuell über den Community-Discord vergeben.</p>
+          <button
+            type="button"
+            onClick={onLogout}
+            style={styles.logoutBtn}
+          >
+            Abmelden / Zurück zum Hauptmenü
+          </button>
         </div>
       </div>
     </div>
@@ -63,7 +98,7 @@ const BetaGate = ({ onAccessGranted }) => {
 };
 
 const styles = {
-  container: {
+  overlay: {
     minHeight: '100vh',
     backgroundColor: '#020617',
     display: 'flex',
@@ -73,95 +108,107 @@ const styles = {
     color: '#e2e8f0',
     fontFamily: 'system-ui, -apple-system, sans-serif',
   },
-  card: {
+  terminalCard: {
     backgroundColor: '#0f172a',
     border: '1px solid #1e293b',
     borderRadius: '12px',
-    padding: '36px 32px',
+    padding: '36px',
     maxWidth: '460px',
     width: '100%',
     textAlign: 'center',
-    boxShadow: '0 0 35px rgba(6, 182, 212, 0.12)',
+    boxShadow: '0 0 35px rgba(6, 182, 212, 0.15)',
   },
   badge: {
     display: 'inline-block',
-    fontSize: '0.72rem',
+    fontSize: '0.75rem',
     fontWeight: 'bold',
     color: '#06b6d4',
     letterSpacing: '1.5px',
-    marginBottom: '18px',
-    padding: '5px 12px',
+    marginBottom: '16px',
+    padding: '4px 12px',
     borderRadius: '4px',
     backgroundColor: 'rgba(6, 182, 212, 0.1)',
-    border: '1px solid rgba(6, 182, 212, 0.25)',
+    border: '1px solid rgba(6, 182, 212, 0.2)',
   },
-  heading: {
+  title: {
     margin: '0 0 12px 0',
     fontSize: '1.5rem',
     color: '#f8fafc',
-    letterSpacing: '0.5px',
   },
-  text: {
+  subtext: {
     color: '#94a3b8',
-    fontSize: '0.92rem',
-    lineHeight: '1.6',
+    fontSize: '0.9rem',
+    lineHeight: '1.5',
     marginBottom: '24px',
   },
-  errorBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.12)',
-    border: '1px solid #ef4444',
-    color: '#fca5a5',
-    padding: '12px',
-    borderRadius: '6px',
-    fontSize: '0.88rem',
+  inputGroup: {
     marginBottom: '20px',
-  },
-  form: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
     textAlign: 'left',
   },
-  inputGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '6px',
-  },
   label: {
-    fontSize: '0.82rem',
-    color: '#94a3b8',
-    fontWeight: '600',
+    display: 'block',
+    fontSize: '0.8rem',
+    color: '#64748b',
+    marginBottom: '6px',
+    textTransform: 'uppercase',
+    letterSpacing: '1px',
   },
   input: {
+    width: '100%',
+    boxSizing: 'border-box',
     backgroundColor: '#020617',
     border: '1px solid #334155',
     borderRadius: '6px',
-    padding: '12px 14px',
-    color: '#f8fafc',
-    fontSize: '0.95rem',
+    padding: '12px',
+    color: '#06b6d4',
+    fontSize: '1.1rem',
+    fontWeight: 'bold',
+    letterSpacing: '2px',
+    textAlign: 'center',
     outline: 'none',
-    transition: 'border-color 0.2s',
+  },
+  errorBox: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    border: '1px solid #ef4444',
+    color: '#fca5a5',
+    padding: '10px',
+    borderRadius: '6px',
+    marginBottom: '16px',
+    fontSize: '0.85rem',
   },
   submitBtn: {
+    width: '100%',
     backgroundColor: '#06b6d4',
     color: '#020617',
     border: 'none',
-    padding: '12px 20px',
+    padding: '12px',
     borderRadius: '6px',
     fontWeight: 'bold',
-    fontSize: '0.95rem',
+    fontSize: '1rem',
     cursor: 'pointer',
-    marginTop: '6px',
     boxShadow: '0 0 15px rgba(6, 182, 212, 0.3)',
-    transition: 'all 0.2s',
   },
-  footerNote: {
-    marginTop: '28px',
-    fontSize: '0.72rem',
-    color: '#475569',
-    letterSpacing: '1px',
+  btnDisabled: {
+    opacity: 0.6,
+    cursor: 'not-allowed',
+  },
+  footer: {
+    marginTop: '24px',
     borderTop: '1px solid #1e293b',
     paddingTop: '16px',
+  },
+  hint: {
+    fontSize: '0.8rem',
+    color: '#64748b',
+    margin: '0 0 12px 0',
+  },
+  logoutBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#94a3b8',
+    textDecoration: 'underline',
+    cursor: 'pointer',
+    fontSize: '0.85rem',
   },
 };
 

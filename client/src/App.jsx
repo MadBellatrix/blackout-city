@@ -67,9 +67,9 @@ export default function App() {
     airPurifier: 0,
   });
 
-  // 1. Spielstand beim Start laden: Nur wenn ein Benutzer eingeloggt ist
+  // 1. Spielstand beim Start laden: Nur wenn ein Benutzer eingeloggt ist UND Beta-Zugang hat
   useEffect(() => {
-    if (!currentUser) {
+    if (!currentUser || !currentUser.hasBetaAccess) {
       isLoadedRef.current = false;
       return;
     }
@@ -149,9 +149,9 @@ export default function App() {
     };
   }, [buildingLevels.fragmentsCollector, buildingLevels.dataNode]);
 
-  // 2. Game Loop (jede Sekunde / 1000ms): Nur aktiv, wenn angemeldet
+  // 2. Game Loop (jede Sekunde / 1000ms): Nur aktiv, wenn angemeldet & mit Beta-Zugang
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.hasBetaAccess) return;
 
     const timer = window.setInterval(() => {
       setResources((currentResources) => ({
@@ -165,9 +165,9 @@ export default function App() {
     return () => window.clearInterval(timer);
   }, [currentUser, production]);
 
-  // 3. Autosave alle 15 Sekunden (Phase 2: Persistenz): Nur aktiv, wenn angemeldet
+  // 3. Autosave alle 15 Sekunden (Phase 2: Persistenz): Nur aktiv, wenn angemeldet & mit Beta-Zugang
   useEffect(() => {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.hasBetaAccess) return;
 
     const saveTimer = window.setInterval(async () => {
       if (!isLoadedRef.current) return;
@@ -256,10 +256,18 @@ export default function App() {
     });
   };
 
+  const handleBetaAccessGranted = (updatedPlayer) => {
+    if (updatedPlayer) {
+      setCurrentUser(updatedPlayer);
+    } else {
+      setCurrentUser((prev) => (prev ? { ...prev, hasBetaAccess: true } : null));
+    }
+  };
+
   const activeBuildingConfig = BUILDINGS[selectedBuilding] || BUILDINGS.fragmentsCollector;
   const activeBuildingLevel = extractLevel(buildingLevels[selectedBuilding]);
 
-  // Verifizierungs-Screen anzeigen, falls Benutzer über den E-Mail-Link kommt
+  // 1. Verifizierungs-Screen: Wenn Benutzer über den Bestätigungslink der E-Mail kommt
   if (isVerifyingEmail) {
     return (
       <VerifyEmail
@@ -271,31 +279,42 @@ export default function App() {
     );
   }
 
-  // Beta-Vorschaltseite: Zeigen, solange kein Tester-Zugriff besteht
-  if (!hasBetaAccess) {
-    return <BetaGate onAccessGranted={() => setHasBetaAccess(true)} />;
+  // 2. Nicht eingeloggt: Zeige ausschließlich die Landingpage mit Trailer & Login
+  if (!currentUser) {
+    return (
+      <div className="site-shell" style={{ backgroundColor: "#071010", minHeight: "100vh" }}>
+        <LandingPage onOpenAuth={() => setIsAuthModalOpen(true)} />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onAuthSuccess={handleAuthSuccess}
+        />
+      </div>
+    );
   }
 
+  // 3. Eingeloggt, aber noch kein Beta-Zugang: Autorisierungs-Terminal für Discord-Code
+  if (!currentUser.hasBetaAccess) {
+    return (
+      <BetaGate
+        username={currentUser.username}
+        onAccessGranted={handleBetaAccessGranted}
+        onLogout={handleLogout}
+      />
+    );
+  }
+
+  // 4. Berechtigter Beta-Tester: Voller Zugriff auf die Kuppel und Spiel-Loop
   return (
     <>
     <div className="site-shell" style={{ backgroundColor: "#071010", minHeight: "100vh" }}>
-      {!currentUser ? (
-        <>
-          <LandingPage onOpenAuth={() => setIsAuthModalOpen(true)} />
-          <AuthModal
-            isOpen={isAuthModalOpen}
-            onClose={() => setIsAuthModalOpen(false)}
-            onAuthSuccess={handleAuthSuccess}
-          />
-        </>
-      ) : (
-        <main className="game-page" style={{ maxWidth: "1280px", margin: "0 auto", padding: "20px 24px" }}>
-          <ResourceBar
-            resources={resources}
-            production={production}
-            usedAir={usedAir}
-            airCapacity={airCapacity}
-          />
+      <main className="game-page" style={{ maxWidth: "1280px", margin: "0 auto", padding: "20px 24px" }}>
+        <ResourceBar
+          resources={resources}
+          production={production}
+          usedAir={usedAir}
+          airCapacity={airCapacity}
+        />
 
         {offlineNotice && (
           <div
@@ -541,7 +560,6 @@ export default function App() {
           onAuthSuccess={handleAuthSuccess}
         />
       </main>
-      )}
     </div>
     </>
   );

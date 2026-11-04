@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import Player from '../models/Player.js';
+import BetaCode from '../models/BetaCode.js';
 import { sendVerificationEmail } from '../services/emailService.js';
 
 // Hilfsfunktion: Token generieren (7 Tage Gültigkeit)
@@ -129,6 +130,9 @@ export const login = async (req, res) => {
       player: {
         id: player._id,
         username: player.username,
+        email: player.email,
+        isVerified: player.isVerified,
+        hasBetaAccess: player.hasBetaAccess || false,
         resources: player.resources,
         buildings: player.buildings,
         workers: player.workers,
@@ -174,8 +178,69 @@ export const verifyEmail = async (req, res) => {
   }
 };
 
+// Beta-Code einlösen
+export const redeemBetaCode = async (req, res) => {
+  try {
+    const { code } = req.body;
+    const playerId = req.player.id || req.player._id; // Aus authMiddleware (JWT)
+
+    if (!code) {
+      return res.status(400).json({ message: 'Bitte gib einen Beta-Code ein.' });
+    }
+
+    const cleanCode = code.trim().toUpperCase();
+
+    // Prüfen, ob Spieler bereits freigeschaltet ist
+    if (req.player.hasBetaAccess) {
+      return res.status(200).json({
+        message: 'Du hast bereits autorisierten Beta-Zugang.',
+        player: req.player,
+      });
+    }
+
+    // 1. Atomare Prüfung & Entwertung (Schutz vor doppelter Einlösung / Race Condition)
+    const betaDoc = await BetaCode.findOneAndUpdate(
+      { code: cleanCode, isUsed: false },
+      {
+        $set: {
+          isUsed: true,
+          usedBy: playerId,
+          usedAt: new Date(),
+        },
+      },
+      { new: true }
+    );
+
+    if (!betaDoc) {
+      return res.status(400).json({
+        message: 'Dieser Beta-Code ist ungültig oder wurde bereits von einem anderen Bürger eingelöst.',
+      });
+    }
+
+    // 2. Spieler freischalten
+    const updatedPlayer = await Player.findByIdAndUpdate(
+      playerId,
+      {
+        $set: {
+          hasBetaAccess: true,
+        },
+      },
+      { new: true }
+    ).select('-password');
+
+    res.status(200).json({
+      message: 'Autorisierung erfolgreich! Die Schotten zur Kuppel öffnen sich.',
+      player: updatedPlayer,
+    });
+  } catch (error) {
+    console.error('Fehler beim Einlösen des Beta-Codes:', error);
+    res.status(500).json({ message: 'Serverfehler bei der Autorisierung.', error: error.message });
+  }
+};
+
 export default {
   register,
   login,
-  verifyEmail
+  verifyEmail,
+  redeemBetaCode
 };
