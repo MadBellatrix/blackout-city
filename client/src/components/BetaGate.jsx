@@ -1,48 +1,34 @@
 import React, { useState } from 'react';
 
-const BetaGate = ({ onAccessGranted, onLogout, username }) => {
-  const [code, setCode] = useState('');
-  const [error, setError] = useState(null);
+const BetaGate = ({ onOpenLogin, onOpenRegister }) => {
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [nickname, setNickname] = useState('');
+  const [discordTag, setDiscordTag] = useState('');
+  const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const [error, setError] = useState(null);
 
-  const handleSubmit = async (e) => {
+  const handleRequestSubmit = async (e) => {
     e.preventDefault();
-    setError(null);
     setLoading(true);
-
-    const token = localStorage.getItem('blackout_token');
+    setError(null);
+    setFeedback(null);
 
     try {
-      const response = await fetch('/api/auth/redeem-beta', {
+      const response = await fetch('/api/auth/request-beta', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ code: code.trim().toUpperCase() }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nickname, discordTag, message }),
       });
 
-      const contentType = response.headers.get('content-type') || '';
-      let data;
-      if (contentType.includes('application/json')) {
-        data = await response.json();
-      } else {
-        const text = await response.text();
-        throw new Error(
-          `Der Server hat kein JSON geliefert (Status ${response.status}). Läuft der Backend-Server auf Port 5000?`
-        );
-      }
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Übertragung fehlgeschlagen');
 
-      if (!response.ok) {
-        throw new Error(data.message || 'Autorisierung fehlgeschlagen.');
-      }
-
-      // Spielerdaten im localStorage aktualisieren
-      if (data.player) {
-        localStorage.setItem('blackout_player', JSON.stringify(data.player));
-      }
-
-      onAccessGranted(data.player);
+      setFeedback(data.message);
+      setNickname('');
+      setDiscordTag('');
+      setMessage('');
     } catch (err) {
       setError(err.message);
     } finally {
@@ -52,55 +38,80 @@ const BetaGate = ({ onAccessGranted, onLogout, username }) => {
 
   return (
     <div style={styles.overlay}>
-      <div style={styles.terminalCard}>
-        <div style={styles.badge}>BLACKOUT-CITY // AUTORISIERUNGSTERMINAL</div>
-        <h1 style={styles.title}>Kuppel-Schleuse Verriegelt</h1>
+      <div style={styles.card}>
+        <div style={styles.badge}>BLACKOUT-CITY // GESCHLOSSENE BETA</div>
+        <h1 style={styles.title}>Zugang zur Biosphäre</h1>
         <p style={styles.subtext}>
-          Bürger-ID <strong>{username || 'Unbekannt'}</strong> authentifiziert. Zur Dekompression und Zuteilung von Sauerstoffkontingenten wird ein gültiger <strong>Closed-Beta-Sicherheitscode</strong> benötigt.
+          Die Kuppel befindet sich im Versuchsbetrieb. Der Zutritt ist aktuell autorisierten Testern vorbehalten.
         </p>
 
-        {error && <div style={styles.errorBox}>{error}</div>}
-
-        <form onSubmit={handleSubmit}>
-          <div style={styles.inputGroup}>
-            <label style={styles.label} htmlFor="beta-code-input">
-              Sicherheitscode eingeben
-            </label>
-            <input
-              id="beta-code-input"
-              type="text"
-              style={styles.input}
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="BC-XXXX-XXXX"
-              autoFocus
-              required
-              disabled={loading}
-            />
+        {!showRequestForm ? (
+          <div style={styles.buttonStack}>
+            <button onClick={onOpenRegister} style={styles.primaryBtn} type="button">
+              ⚡ Ich habe einen Beta-Code (Registrieren)
+            </button>
+            <button onClick={onOpenLogin} style={styles.secondaryBtn} type="button">
+              Bereits Bürger (Anmelden)
+            </button>
+            <div style={styles.divider}>ODER</div>
+            <button onClick={() => setShowRequestForm(true)} style={styles.requestBtn} type="button">
+              📩 Beta-Zugang anfordern (Discord)
+            </button>
           </div>
+        ) : (
+          <form onSubmit={handleRequestSubmit} style={styles.form}>
+            <h3 style={styles.formTitle}>Signal an Discord-Zentrale</h3>
+            
+            {feedback && <div style={styles.successBox}>{feedback}</div>}
+            {error && <div style={styles.errorBox}>{error}</div>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            style={{
-              ...styles.submitBtn,
-              ...(loading ? styles.btnDisabled : {}),
-            }}
-          >
-            {loading ? 'Autorisiere...' : 'Schleuse Entriegeln'}
-          </button>
-        </form>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Dein Nickname / Name</label>
+              <input
+                type="text"
+                required
+                value={nickname}
+                onChange={(e) => setNickname(e.target.value)}
+                placeholder="z. B. Scout_042"
+                style={styles.input}
+              />
+            </div>
 
-        <div style={styles.footer}>
-          <p style={styles.hint}>Codes werden manuell über den Community-Discord vergeben.</p>
-          <button
-            type="button"
-            onClick={onLogout}
-            style={styles.logoutBtn}
-          >
-            Abmelden / Zurück zum Hauptmenü
-          </button>
-        </div>
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Discord Benutzername (für Code-Zusendung)</label>
+              <input
+                type="text"
+                required
+                value={discordTag}
+                onChange={(e) => setDiscordTag(e.target.value)}
+                placeholder="z. B. @scout oder Name#1234"
+                style={styles.input}
+              />
+            </div>
+
+            <div style={styles.inputGroup}>
+              <label style={styles.label}>Nachricht / Motivation (optional)</label>
+              <textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="Warum möchtest du beim Testen helfen?"
+                rows={3}
+                style={styles.textarea}
+              />
+            </div>
+
+            <button type="submit" disabled={loading} style={styles.submitBtn}>
+              {loading ? 'Sende Signal...' : 'Anfrage an Discord absenden'}
+            </button>
+            <button
+              type="button"
+              onClick={() => { setShowRequestForm(false); setFeedback(null); setError(null); }}
+              style={styles.backBtn}
+            >
+              Zurück zur Auswahl
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );
@@ -117,107 +128,126 @@ const styles = {
     color: '#e2e8f0',
     fontFamily: 'system-ui, -apple-system, sans-serif',
   },
-  terminalCard: {
-    backgroundColor: '#0f172a',
-    border: '1px solid #1e293b',
+  card: {
+    backgroundColor: '#0a1512',
+    border: '1px solid rgba(34, 197, 94, 0.25)',
     borderRadius: '12px',
     padding: '36px',
     maxWidth: '460px',
     width: '100%',
     textAlign: 'center',
-    boxShadow: '0 0 35px rgba(6, 182, 212, 0.15)',
+    boxShadow: '0 0 40px rgba(34, 197, 94, 0.18)',
   },
   badge: {
     display: 'inline-block',
     fontSize: '0.75rem',
     fontWeight: 'bold',
-    color: '#06b6d4',
+    color: '#22c55e',
     letterSpacing: '1.5px',
     marginBottom: '16px',
     padding: '4px 12px',
     borderRadius: '4px',
-    backgroundColor: 'rgba(6, 182, 212, 0.1)',
-    border: '1px solid rgba(6, 182, 212, 0.2)',
+    backgroundColor: 'rgba(34, 197, 94, 0.12)',
+    border: '1px solid rgba(34, 197, 94, 0.35)',
+    boxShadow: '0 0 12px rgba(34, 197, 94, 0.2)',
   },
-  title: {
-    margin: '0 0 12px 0',
-    fontSize: '1.5rem',
-    color: '#f8fafc',
-  },
-  subtext: {
-    color: '#94a3b8',
-    fontSize: '0.9rem',
-    lineHeight: '1.5',
-    marginBottom: '24px',
-  },
-  inputGroup: {
-    marginBottom: '20px',
-    textAlign: 'left',
-  },
-  label: {
-    display: 'block',
-    fontSize: '0.8rem',
-    color: '#64748b',
-    marginBottom: '6px',
-    textTransform: 'uppercase',
-    letterSpacing: '1px',
-  },
-  input: {
-    width: '100%',
-    boxSizing: 'border-box',
-    backgroundColor: '#020617',
-    border: '1px solid #334155',
+  title: { margin: '0 0 12px 0', fontSize: '1.5rem', color: '#f8fafc', letterSpacing: '0.5px' },
+  subtext: { color: '#94a3b8', fontSize: '0.9rem', lineHeight: '1.5', marginBottom: '24px' },
+  buttonStack: { display: 'flex', flexDirection: 'column', gap: '12px' },
+  primaryBtn: {
+    backgroundColor: '#22c55e',
+    color: '#021208',
+    border: 'none',
+    padding: '14px',
     borderRadius: '6px',
-    padding: '12px',
-    color: '#06b6d4',
-    fontSize: '1.1rem',
     fontWeight: 'bold',
-    letterSpacing: '2px',
-    textAlign: 'center',
-    outline: 'none',
+    fontSize: '0.95rem',
+    cursor: 'pointer',
+    boxShadow: '0 0 20px rgba(34, 197, 94, 0.45)',
+    transition: 'all 0.2s ease',
   },
-  errorBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    border: '1px solid #ef4444',
-    color: '#fca5a5',
-    padding: '10px',
+  secondaryBtn: {
+    backgroundColor: '#0f231c',
+    color: '#e2e8f0',
+    border: '1px solid rgba(34, 197, 94, 0.3)',
+    padding: '12px',
     borderRadius: '6px',
-    marginBottom: '16px',
-    fontSize: '0.85rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+  },
+  divider: { fontSize: '0.75rem', color: '#4ade80', opacity: 0.6, margin: '4px 0', letterSpacing: '1px' },
+  requestBtn: {
+    backgroundColor: 'transparent',
+    color: '#4ade80',
+    border: '1px dashed #22c55e',
+    padding: '12px',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    transition: 'all 0.2s ease',
+  },
+  form: { textAlign: 'left', marginTop: '16px' },
+  formTitle: { fontSize: '1.1rem', margin: '0 0 16px 0', color: '#86efac', textAlign: 'center' },
+  inputGroup: { marginBottom: '14px', display: 'flex', flexDirection: 'column', gap: '6px' },
+  label: { fontSize: '0.8rem', color: '#86efac' },
+  input: {
+    backgroundColor: '#020617',
+    border: '1px solid rgba(34, 197, 94, 0.35)',
+    borderRadius: '6px',
+    padding: '10px',
+    color: '#f8fafc',
+    outline: 'none',
+    transition: 'border-color 0.2s, box-shadow 0.2s',
+  },
+  textarea: {
+    backgroundColor: '#020617',
+    border: '1px solid rgba(34, 197, 94, 0.35)',
+    borderRadius: '6px',
+    padding: '10px',
+    color: '#f8fafc',
+    outline: 'none',
+    resize: 'vertical',
   },
   submitBtn: {
     width: '100%',
-    backgroundColor: '#06b6d4',
-    color: '#020617',
+    backgroundColor: '#22c55e',
+    color: '#021208',
     border: 'none',
     padding: '12px',
     borderRadius: '6px',
     fontWeight: 'bold',
-    fontSize: '1rem',
     cursor: 'pointer',
-    boxShadow: '0 0 15px rgba(6, 182, 212, 0.3)',
+    marginTop: '10px',
+    boxShadow: '0 0 15px rgba(34, 197, 94, 0.4)',
   },
-  btnDisabled: {
-    opacity: 0.6,
-    cursor: 'not-allowed',
-  },
-  footer: {
-    marginTop: '24px',
-    borderTop: '1px solid #1e293b',
-    paddingTop: '16px',
-  },
-  hint: {
-    fontSize: '0.8rem',
-    color: '#64748b',
-    margin: '0 0 12px 0',
-  },
-  logoutBtn: {
-    background: 'none',
-    border: 'none',
+  backBtn: {
+    width: '100%',
+    backgroundColor: 'transparent',
     color: '#94a3b8',
-    textDecoration: 'underline',
+    border: 'none',
+    padding: '10px',
     cursor: 'pointer',
+    marginTop: '6px',
     fontSize: '0.85rem',
+  },
+  successBox: {
+    backgroundColor: 'rgba(34, 197, 94, 0.15)',
+    border: '1px solid #22c55e',
+    color: '#86efac',
+    padding: '12px',
+    borderRadius: '6px',
+    fontSize: '0.85rem',
+    marginBottom: '14px',
+  },
+  errorBox: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    border: '1px solid #ef4444',
+    color: '#fca5a5',
+    padding: '12px',
+    borderRadius: '6px',
+    fontSize: '0.85rem',
+    marginBottom: '14px',
   },
 };
 
