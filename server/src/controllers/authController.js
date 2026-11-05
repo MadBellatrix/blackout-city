@@ -49,7 +49,9 @@ export const requestBetaAccess = async (req, res) => {
     });
 
     if (!response.ok) {
-      throw new Error('Discord-Webhook konnte nicht erreicht werden.');
+      const errBody = await response.text();
+      console.error('Discord API Error:', response.status, errBody);
+      throw new Error(`Discord meldet HTTP ${response.status}: ${errBody || 'Keine Details'}`);
     }
 
     res.status(200).json({ message: 'Deine Anfrage wurde erfolgreich an den Discord-Kanal übermittelt!' });

@@ -22,10 +22,17 @@ const BetaGate = ({ onOpenLogin, onOpenRegister }) => {
         body: JSON.stringify({ nickname, discordTag, message }),
       });
 
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Übertragung fehlgeschlagen');
+      const contentType = response.headers.get('content-type');
+      let data = {};
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      }
 
-      setFeedback(data.message);
+      if (!response.ok) {
+        throw new Error(data.message || `Übertragungsfehler (HTTP ${response.status})`);
+      }
+
+      setFeedback(data.message || 'Anfrage erfolgreich gesendet!');
       setNickname('');
       setDiscordTag('');
       setMessage('');
