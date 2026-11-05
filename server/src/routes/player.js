@@ -99,13 +99,27 @@ router.post('/player/:userId/save', async (req, res) => {
         player = new Player({
           ...getInitialPlayerData(userId),
           ...(resources && { resources }),
-          ...(buildings && { buildings }),
           lastActive: now
         });
       } else {
         if (resources) player.resources = resources;
-        if (buildings) player.buildings = buildings;
         player.lastActive = now;
+      }
+
+      if (buildings) {
+        // Sicherstellen, dass buildings immer das Schema { level: Number } einhält
+        const normalizeBuilding = (val) => {
+          if (typeof val === 'number') return { level: val };
+          if (val && typeof val.level === 'number') return { level: val.level };
+          return { level: 0 };
+        };
+
+        player.buildings = {
+          fragmentsCollector: normalizeBuilding(buildings.fragmentsCollector),
+          dataNode: normalizeBuilding(buildings.dataNode),
+          airPurifier: normalizeBuilding(buildings.airPurifier),
+          museum: normalizeBuilding(buildings.museum),
+        };
       }
 
       await player.save();

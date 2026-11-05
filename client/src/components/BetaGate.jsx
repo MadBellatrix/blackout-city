@@ -22,7 +22,16 @@ const BetaGate = ({ onAccessGranted, onLogout, username }) => {
         body: JSON.stringify({ code: code.trim().toUpperCase() }),
       });
 
-      const data = await response.json();
+      const contentType = response.headers.get('content-type') || '';
+      let data;
+      if (contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        const text = await response.text();
+        throw new Error(
+          `Der Server hat kein JSON geliefert (Status ${response.status}). Läuft der Backend-Server auf Port 5000?`
+        );
+      }
 
       if (!response.ok) {
         throw new Error(data.message || 'Autorisierung fehlgeschlagen.');

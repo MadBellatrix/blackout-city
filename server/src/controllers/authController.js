@@ -60,12 +60,16 @@ export const register = async (req, res) => {
 
     await player.save();
 
-    // Verifizierungs-E-Mail versenden
-    await sendVerificationEmail({
-      email: player.email,
-      username: player.username,
-      token: verificationToken,
-    });
+    // Verifizierungs-E-Mail versenden (Fehler abfangen, damit die Registrierung nicht blockiert wird)
+    try {
+      await sendVerificationEmail({
+        email: player.email,
+        username: player.username,
+        token: verificationToken,
+      });
+    } catch (mailError) {
+      console.warn('Verifizierungs-E-Mail konnte nicht gesendet werden:', mailError.message);
+    }
 
     return res.status(201).json({
       message: 'Registrierung erfolgreich! Bitte überprüfe dein Postfach, um deine Bürger-ID zu bestätigen.',

@@ -238,7 +238,20 @@ export default function App() {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Vor dem Logout aktuellen Spielstand noch einmal sauber in MongoDB speichern
+    if (currentUser) {
+      const targetId = currentUser?.username || currentUser?.id || userId;
+      try {
+        await savePlayerState(targetId, {
+          resources,
+          buildings: buildingLevels,
+        });
+      } catch (err) {
+        console.warn("Konnte Spielstand vor Logout nicht mehr senden:", err);
+      }
+    }
+
     localStorage.removeItem("blackout_token");
     localStorage.removeItem("blackout_player");
     setCurrentUser(null);
