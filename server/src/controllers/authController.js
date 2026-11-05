@@ -9,83 +9,140 @@ const generateToken = (id) => {
   return jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
 
-// Registrierung
+// 1. Kontaktanfrage an Discord-Webhook senden
+export const requestBetaAccess = async (req, res) => {
+  try {
+    const { nickname, discordTag, message } = req.body;
+    const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+
+    if (!nickname || !discordTag) {
+      return res.status(400).json({ message: 'Bitte Nickname und Discord-Tag angeben.' });
+    }
+
+    if (!webhookUrl) {
+      console.log('[DEV] Kein DISCORD_WEBHOOK_URL gesetzt. Anfrage:', { nickname, discordTag, message });
+      return res.status(200).json({ message: 'Anfrage im Entwicklungsmodus empfangen.' });
+    }
+
+    const discordPayload = {
+      username: 'Blackout-City Schleusentor',
+      embeds: [
+        {
+          title: '🚨 NEUE BETA-ZUGANGSANFRAGE',
+          color: 0x06b6d4, // Cyan
+          description: 'Ein Überlebender bittet um Autorisierung für die Kuppel.',
+          fields: [
+            { name: '👤 Bürger / Name', value: nickname, inline: true },
+            { name: '💬 Discord-Kontakt', value: discordTag, inline: true },
+            { name: '📝 Nachricht / Motivation', value: message || 'Keine Nachricht hinterlassen.' },
+          ],
+          footer: { text: 'Nutze /betacode im Admin-Kanal, um einen Einmal-Code zu generieren.' },
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    };
+
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(discordPayload),
+    });
+
+    if (!response.ok) {
+      const errBody = await response.text();
+      console.error('Discord API Error:', response.status, errBody);
+      throw new Error(`Discord meldet HTTP ${response.status}: ${errBody || 'Keine Details'}`);
+    }
+
+    res.status(200).json({ message: 'Deine Anfrage wurde erfolgreich an den Discord-Kanal übermittelt!' });
+  } catch (error) {
+    console.error('Fehler bei Webhook-Übertragung:', error);
+    res.status(500).json({ message: 'Übertragungsfehler.', error: error.message });
+  }
+};
+
+// 2. Registrierung: Atomare Prüfung des Einmal-Beta-Codes
 export const register = async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, betaCode } = req.body;
 
-    // Validierung: Alle Felder erforderlich
-    if (!username || !email || !password) {
+    if (!username || !email || !password || !betaCode) {
+      return res.status(400).json({ message: 'Benutzername, E-Mail, Passwort und Beta-Code sind erforderlich.' });
+    }
+
+    const cleanBetaCode = betaCode.trim().toUpperCase();
+
+    // ATOMARE PRÜFUNG & ENTWERTUNG: Nur gültig, wenn noch NICHT benutzt
+    const codeDoc = await BetaCode.findOneAndUpdate(
+      { code: cleanBetaCode, isUsed: false },
+      {
+        $set: {
+          isUsed: true,
+          usedAt: new Date(),
+        },
+      },
+      { new: true }
+    );
+
+    if (!codeDoc) {
       return res.status(400).json({
-        message: 'Benutzername, E-Mail-Adresse und Passwort sind erforderlich.'
+        message: 'Der angegebene Beta-Code ist ungültig oder wurde bereits verwendet.',
       });
     }
 
-    // Validierung: Username min. 3 Zeichen
-    if (username.trim().length < 3) {
-      return res.status(400).json({
-        message: 'Der Benutzername muss mindestens 3 Zeichen lang sein.'
-      });
+    // Prüfen, ob Benutzername oder E-Mail vergeben sind
+    const existingPlayer = await Player.findOne({
+      $or: [{ username: username.trim() }, { email: email.trim().toLowerCase() }],
+    });
+
+    if (existingPlayer) {
+      // Rollback des Codes, falls Account schon existiert!
+      await BetaCode.findByIdAndUpdate(codeDoc._id, { $set: { isUsed: false, usedAt: null } });
+      return res.status(400).json({ message: 'Benutzername oder E-Mail-Adresse ist bereits vergeben.' });
     }
 
-    // Prüfen, ob Benutzername bereits existiert
-    const existingPlayerByUsername = await Player.findOne({ username: username.trim() });
-    if (existingPlayerByUsername) {
-      return res.status(400).json({
-        message: 'Dieser Benutzername ist bereits vergeben.'
-      });
-    }
-
-    // Prüfen, ob E-Mail-Adresse bereits existiert
-    const existingPlayerByEmail = await Player.findOne({ email: email.trim().toLowerCase() });
-    if (existingPlayerByEmail) {
-      return res.status(400).json({
-        message: 'Diese E-Mail-Adresse ist bereits registriert.'
-      });
-    }
-
-    // Verifizierungs-Token generieren (24h Gültigkeit)
+    // Token für E-Mail-Verifizierung erzeugen (24h Gültigkeit)
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const verificationTokenExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    // Neuen Spieler anlegen
-    const player = new Player({
+    const newPlayer = await Player.create({
       username: username.trim(),
       email: email.trim().toLowerCase(),
       password,
+      hasBetaAccess: true,
       isVerified: false,
       verificationToken,
       verificationTokenExpires,
     });
 
-    await player.save();
+    // Code mit Spieler verknüpfen
+    codeDoc.usedBy = newPlayer._id;
+    await codeDoc.save();
 
-    // Verifizierungs-E-Mail versenden (Fehler abfangen, damit die Registrierung nicht blockiert wird)
+    // Verifizierungs-E-Mail über Resend senden (in try/catch gekapselt)
     try {
       await sendVerificationEmail({
-        email: player.email,
-        username: player.username,
+        email: newPlayer.email,
+        username: newPlayer.username,
         token: verificationToken,
       });
     } catch (mailError) {
       console.warn('Verifizierungs-E-Mail konnte nicht gesendet werden:', mailError.message);
     }
 
-    return res.status(201).json({
-      message: 'Registrierung erfolgreich! Bitte überprüfe dein Postfach, um deine Bürger-ID zu bestätigen.',
+    res.status(201).json({
+      message: 'Registrierung erfolgreich! Bitte bestätige deine Bürger-ID über den Link in deiner E-Mail.',
       player: {
-        id: player._id,
-        username: player.username,
-        email: player.email,
-        isVerified: player.isVerified,
-      }
+        id: newPlayer._id,
+        username: newPlayer.username,
+        email: newPlayer.email,
+        isVerified: newPlayer.isVerified,
+        hasBetaAccess: newPlayer.hasBetaAccess,
+      },
     });
   } catch (error) {
-    console.error('Fehler bei der Registrierung:', error);
-    return res.status(500).json({
-      message: 'Interner Serverfehler bei der Registrierung.',
-      error: error.message
-    });
+    console.error('Registrierungsfehler:', error);
+    res.status(500).json({ message: 'Serverfehler bei der Registrierung.', error: error.message });
   }
 };
 
@@ -243,6 +300,7 @@ export const redeemBetaCode = async (req, res) => {
 };
 
 export default {
+  requestBetaAccess,
   register,
   login,
   verifyEmail,

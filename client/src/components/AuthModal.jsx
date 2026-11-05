@@ -1,13 +1,21 @@
 import React, { useState } from 'react';
 
-const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
-  const [isLogin, setIsLogin] = useState(true);
+const AuthModal = ({ isOpen, onClose, onAuthSuccess, initialMode = 'login' }) => {
+  const [isLogin, setIsLogin] = useState(initialMode !== 'register');
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [betaCode, setBetaCode] = useState('');
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState(null);
   const [loading, setLoading] = useState(false);
+
+  // Synchronisiere initialMode, wenn das Modal geöffnet wird
+  React.useEffect(() => {
+    setIsLogin(initialMode !== 'register');
+    setError(null);
+    setSuccessMessage(null);
+  }, [initialMode, isOpen]);
 
   if (!isOpen) return null;
 
@@ -24,7 +32,9 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     setLoading(true);
 
     const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
-    const payload = isLogin ? { username, password } : { username, email, password };
+    const payload = isLogin
+      ? { username, password }
+      : { username, email, password, betaCode: betaCode.trim().toUpperCase() };
 
     try {
       const response = await fetch(endpoint, {
@@ -57,6 +67,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         setUsername('');
         setEmail('');
         setPassword('');
+        setBetaCode('');
       }
     } catch (err) {
       setError(err.message);
@@ -134,21 +145,38 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
           </div>
 
           {!isLogin && (
-            <div style={styles.inputGroup}>
-              <label style={styles.label} htmlFor="auth-email">
-                E-Mail-Adresse
-              </label>
-              <input
-                id="auth-email"
-                type="email"
-                style={styles.input}
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="z. B. bürger@blackout-city.de"
-                required
-                autoComplete="email"
-              />
-            </div>
+            <>
+              <div style={styles.inputGroup}>
+                <label style={styles.label} htmlFor="auth-email">
+                  E-Mail-Adresse
+                </label>
+                <input
+                  id="auth-email"
+                  type="email"
+                  style={styles.input}
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="z. B. bürger@blackout-city.de"
+                  required
+                  autoComplete="email"
+                />
+              </div>
+
+              <div style={styles.inputGroup}>
+                <label style={styles.label} htmlFor="auth-betacode">
+                  Beta-Zugangscode (Einmalig gültig)
+                </label>
+                <input
+                  id="auth-betacode"
+                  type="text"
+                  required
+                  value={betaCode}
+                  onChange={(e) => setBetaCode(e.target.value.toUpperCase())}
+                  placeholder="BC-XXXX-2026"
+                  style={{ ...styles.input, letterSpacing: '1px', textTransform: 'uppercase' }}
+                />
+              </div>
+            </>
           )}
 
           <div style={styles.inputGroup}>

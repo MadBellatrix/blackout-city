@@ -34,7 +34,7 @@ const extractLevel = (val) => {
 };
 
 export default function App() {
-  const [hasBetaAccess, setHasBetaAccess] = useState(false);
+  const [authMode, setAuthMode] = useState('login'); // 'login' | 'register'
   const [isVerifyingEmail, setIsVerifyingEmail] = useState(
     () => window.location.pathname === "/verify-email" || new URLSearchParams(window.location.search).has("token")
   );
@@ -292,32 +292,31 @@ export default function App() {
     );
   }
 
-  // 2. Nicht eingeloggt: Zeige ausschließlich die Landingpage mit Trailer & Login
+  // 2. Nicht eingeloggt: Zeige das 3-Wege-Tor (BetaGate) und das Login/Register-Modal
   if (!currentUser) {
     return (
-      <div className="site-shell" style={{ backgroundColor: "#071010", minHeight: "100vh" }}>
-        <LandingPage onOpenAuth={() => setIsAuthModalOpen(true)} />
+      <>
+        <BetaGate
+          onOpenLogin={() => {
+            setAuthMode('login');
+            setIsAuthModalOpen(true);
+          }}
+          onOpenRegister={() => {
+            setAuthMode('register');
+            setIsAuthModalOpen(true);
+          }}
+        />
         <AuthModal
           isOpen={isAuthModalOpen}
+          initialMode={authMode}
           onClose={() => setIsAuthModalOpen(false)}
           onAuthSuccess={handleAuthSuccess}
         />
-      </div>
+      </>
     );
   }
 
-  // 3. Eingeloggt, aber noch kein Beta-Zugang: Autorisierungs-Terminal für Discord-Code
-  if (!currentUser.hasBetaAccess) {
-    return (
-      <BetaGate
-        username={currentUser.username}
-        onAccessGranted={handleBetaAccessGranted}
-        onLogout={handleLogout}
-      />
-    );
-  }
-
-  // 4. Berechtigter Beta-Tester: Voller Zugriff auf die Kuppel und Spiel-Loop
+  // 3. Berechtigter Bürger: Voller Zugriff auf die Kuppel und Spiel-Loop
   return (
     <>
     <div className="site-shell" style={{ backgroundColor: "#071010", minHeight: "100vh" }}>
