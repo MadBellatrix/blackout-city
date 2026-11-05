@@ -1,5 +1,6 @@
 import { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } from 'discord.js';
 import crypto from 'crypto';
+import mongoose from 'mongoose';
 import BetaCode from '../models/BetaCode.js';
 
 let client = null;
@@ -97,10 +98,18 @@ export async function initDiscordBot() {
           }
 
           const creatorTag = `${interaction.user.tag || interaction.user.username} (${interaction.user.id})`;
-          await BetaCode.create({
+
+          console.log('[Discord Bot] Versuche Code in MongoDB zu speichern:', code);
+          console.log('[Discord Bot] Aktuelle Datenbank:', mongoose.connection.name);
+          console.log('[Discord Bot] Mongoose ReadyState:', mongoose.connection.readyState); // 1 = Verbunden
+
+          const newBetaDoc = await BetaCode.create({
             code,
+            isUsed: false,
             createdBy: creatorTag,
           });
+
+          console.log('[Discord Bot] ERFOLGREICH in MongoDB gespeichert:', newBetaDoc);
 
           await interaction.editReply({
             content: `🔑 **Neuer Beta-Zugangscode generiert:**\n\`\`\`${code}\`\`\`\nDieser Code ist einmalig gültig und gewährt Zugang zur Blackout-City Biosphäre.`,
